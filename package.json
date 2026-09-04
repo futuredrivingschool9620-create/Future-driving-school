@@ -1,0 +1,82 @@
+{
+  "name": "future-driving-school",
+  "version": "1.0.0",
+  "description": "Future Driving School - Windows Desktop Management Application",
+  "main": "electron/main.cjs",
+  "private": true,
+  "workspaces": [
+    "client",
+    "server"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:client": "npm run dev --workspace=client",
+    "dev:server": "npm run dev --workspace=server",
+    "dev:electron": "concurrently \"npm run dev:server\" \"npm run dev:client\" \"wait-on http://localhost:5173 && electron .\"",
+    "build": "npm run build --workspace=client && npm run build --workspace=server",
+    "build:electron": "electron-builder --dir",
+    "dist:win": "npm run build && electron-builder --win --x64",
+    "db:migrate": "npm run db:migrate --workspace=server",
+    "db:seed": "npm run db:seed --workspace=server",
+    "db:studio": "npm run db:studio --workspace=server"
+  },
+  "build": {
+    "appId": "com.futuredrivingschool.app",
+    "productName": "Future Driving School",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "electron/**/*",
+      "client/dist/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "server/dist",
+        "to": "server/dist"
+      },
+      {
+        "from": "server/prisma",
+        "to": "server/prisma"
+      },
+      {
+        "from": "server/.env",
+        "to": "server/.env"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Future Driving School"
+    }
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "cross-env": "^7.0.3",
+    "electron": "^40.8.0",
+    "electron-builder": "^26.4.0",
+    "wait-on": "^9.0.4"
+  },
+  "allowScripts": {
+    "@prisma/client@6.19.3": true,
+    "bcrypt@6.0.0": true,
+    "prisma@6.19.3": true,
+    "@prisma/engines@6.19.3": true,
+    "esbuild@0.28.2": true
+  }
+}

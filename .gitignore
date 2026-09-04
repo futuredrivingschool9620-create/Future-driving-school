@@ -1,0 +1,15 @@
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+dist-electron/
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+!**/.env.example
+*.log
+**/*.log
+test-*.cjs
+server/test-db.cjs

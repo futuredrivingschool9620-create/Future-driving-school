@@ -1,0 +1,385 @@
+import { prisma } from '../lib/prisma.js';
+import { NotFoundError } from '../utils/errors.js';
+import { AuditService } from './audit.service.js';
+import { DocumentStatusService } from './documentStatus.service.js';
+import type { CreateDocumentInput } from '../validators/document.schema.js';
+
+export class DocumentService {
+  /**
+   * Add a new document to a customer.
+   * Marks previous documents of the same name as isCurrent=false (history preservation).
+   */
+  static async create(
+    customerId: string,
+    data: CreateDocumentInput,
+    adminId: string,
+    ipAddress?: string
+  ) {
+    // Verify customer exists
+    const customer = await prisma.customer.findUnique({ where: { id: customerId } });
+    if (!customer) {
+      throw new NotFoundError('Customer not found');
+    }
+
+    // Transaction: mark old documents as non-current, create new one
+    const document = await prisma.$transaction(async (tx) => {
+      // Mark all existing current documents of the same name as non-current
+      await tx.document.updateMany({
+        where: {
+          customerId,
+          documentName: data.documentName,
+          isCurrent: true,
+        },
+        data: { isCurrent: false },
+      });
+
+      // Create the new current document
+      return tx.document.create({
+        data: {
+          customerId,
+          documentName: data.documentName,
+          startDate: new Date(data.startDate),
+          endDate: new Date(data.endDate),
+          isActive: true,
+          isCurrent: true,
+          notes: data.notes || null,
+          createdByAdminId: adminId,
+        },
+      });
+    });
+
+    await AuditService.log({
+      adminId,
+      entityType: 'Document',
+      entityId: document.id,
+      action: 'CREATE',
+      newData: document as unknown as Record<string, unknown>,
+      ipAddress,
+    });
+
+    return DocumentStatusService.enrichDocumentWithStatus(document);
+  }
+
+  /**
+   * Get a single document by ID with status.
+   */
+  static async getById(id: string) {
+    const document = await prisma.document.findUnique({
+      where: { id },
+      include: {
+        customer: {
+          select: { id: true, firstName: true, secondName: true, phoneNumber: true, vehicleNumber: true },
+        },
+        createdByAdmin: { select: { id: true, username: true } },
+        updatedByAdmin: { select: { id: true, username: true } },
+      },
+    });
+
+    if (!document) {
+      throw new NotFoundError('Document not found');
+    }
+
+    return {
+      ...DocumentStatusService.enrichDocumentWithStatus(document),
+      customer: document.customer,
+      createdByAdmin: document.createdByAdmin,
+      updatedByAdmin: document.updatedByAdmin,
+    };
+  }
+
+  /**
+   * Update a document (non-renewal changes like notes).
+   */
+  static async update(
+    id: string,
+    data: { documentName?: string; notes?: string },
+    adminId: string,
+    ipAddress?: string
+  ) {
+    const existing = await prisma.document.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundError('Document not found');
+    }
+
+    const updated = await prisma.document.update({
+      where: { id },
+      data: {
+        ...(data.documentName !== undefined && { documentName: data.documentName }),
+        ...(data.notes !== undefined && { notes: data.notes || null }),
+        updatedByAdminId: adminId,
+      },
+    });
+
+    await AuditService.log({
+      adminId,
+      entityType: 'Document',
+      entityId: id,
+      action: 'UPDATE',
+      previousData: existing as unknown as Record<string, unknown>,
+      newData: updated as unknown as Record<string, unknown>,
+      ipAddress,
+    });
+
+    return DocumentStatusService.enrichDocumentWithStatus(updated);
+  }
+
+  /**
+   * Renew a document — creates renewal history, cancels old notifications, updates dates.
+   * Works for both normal renewal (≤ 30 days) and pre-renewal (> 30 days).
+   */
+  static async renew(
+    id: string,
+    data: { newStartDate: string; newEndDate: string; notes?: string; renewalType?: string },
+    adminId: string,
+    ipAddress?: string
+  ) {
+    const existing = await prisma.document.findUnique({
+      where: { id },
+      include: {
+        customer: {
+          select: { id: true, firstName: true, secondName: true, phoneNumber: true, vehicleNumber: true, isActive: true },
+        },
+      },
+    });
+
+    if (!existing) {
+      throw new NotFoundError('Document not found');
+    }
+
+    const renewalType = data.renewalType || 'NORMAL';
+    const renewalNote = data.notes
+      ? `[${renewalType}] ${data.notes}`
+      : `[${renewalType}] Renewal`;
+
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Create renewal history record
+      await tx.renewalHistory.create({
+        data: {
+          customerId: existing.customerId,
+          documentId: existing.id,
+          oldDocumentName: existing.documentName,
+          oldStartDate: existing.startDate,
+          oldEndDate: existing.endDate,
+          newStartDate: new Date(data.newStartDate),
+          newEndDate: new Date(data.newEndDate),
+          adminId,
+          notes: renewalNote,
+        },
+      });
+
+      // 2. Cancel all pending notifications for old expiry date
+      await tx.notification.updateMany({
+        where: {
+          documentId: existing.id,
+          notificationStatus: { in: ['PENDING'] },
+        },
+        data: {
+          notificationStatus: 'CANCELLED',
+          deliveryStatus: 'CANCELLED',
+          cancellationReason: `Document renewed (${renewalType}). Old expiry: ${existing.endDate.toISOString().split('T')[0]}, New expiry: ${data.newEndDate}`,
+        },
+      });
+
+      // 3. Update the document with new dates
+      const updated = await tx.document.update({
+        where: { id },
+        data: {
+          startDate: new Date(data.newStartDate),
+          endDate: new Date(data.newEndDate),
+          renewalVersion: { increment: 1 },
+          updatedByAdminId: adminId,
+        },
+      });
+
+      return updated;
+    });
+
+    await AuditService.log({
+      adminId,
+      entityType: 'Document',
+      entityId: id,
+      action: 'RENEW',
+      previousData: {
+        startDate: existing.startDate,
+        endDate: existing.endDate,
+        renewalVersion: existing.renewalVersion,
+        renewalType,
+      },
+      newData: {
+        startDate: result.startDate,
+        endDate: result.endDate,
+        renewalVersion: result.renewalVersion,
+        renewalType,
+      },
+      ipAddress,
+    });
+
+    return DocumentStatusService.enrichDocumentWithStatus(result);
+  }
+
+  /**
+   * Soft delete a document.
+   */
+  static async delete(id: string, adminId: string, ipAddress?: string) {
+    const existing = await prisma.document.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundError('Document not found');
+    }
+
+    await prisma.document.update({
+      where: { id },
+      data: { isActive: false, isCurrent: false, updatedByAdminId: adminId },
+    });
+
+    await AuditService.log({
+      adminId,
+      entityType: 'Document',
+      entityId: id,
+      action: 'DELETE',
+      previousData: existing as unknown as Record<string, unknown>,
+      ipAddress,
+    });
+
+    return { message: 'Document deleted successfully' };
+  }
+
+  /**
+   * Get all documents for a customer.
+   */
+  static async getCustomerDocuments(customerId: string, page: number = 1, limit: number = 20) {
+    const skip = (page - 1) * limit;
+
+    const [documents, total] = await Promise.all([
+      prisma.document.findMany({
+        where: { customerId, isActive: true, customer: { isActive: true } },
+        include: {
+          createdByAdmin: { select: { id: true, username: true } },
+          updatedByAdmin: { select: { id: true, username: true } },
+        },
+        orderBy: [{ isCurrent: 'desc' }, { documentName: 'asc' }, { createdAt: 'desc' }],
+        skip,
+        take: limit,
+      }),
+      prisma.document.count({ where: { customerId, isActive: true, customer: { isActive: true } } }),
+    ]);
+
+    const enriched = documents.map((doc) => ({
+      ...DocumentStatusService.enrichDocumentWithStatus(doc),
+      createdByAdmin: doc.createdByAdmin,
+      updatedByAdmin: doc.updatedByAdmin,
+    }));
+
+    return {
+      data: enriched,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  /**
+   * Dashboard filter: filter documents by name, status, and date range across all customers.
+   */
+  static async filterDocuments(params: {
+    documentName?: string;
+    status?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const page = params.page || 1;
+    const limit = params.limit || 20;
+    const skip = (page - 1) * limit;
+
+    const where: Record<string, unknown> = { isCurrent: true, isActive: true, customer: { isActive: true } };
+
+    if (params.documentName) {
+      where.documentName = params.documentName;
+    }
+
+    if (params.dateFrom || params.dateTo) {
+      const endDateFilter: Record<string, Date> = {};
+      if (params.dateFrom) {
+        endDateFilter.gte = new Date(params.dateFrom);
+      }
+      if (params.dateTo) {
+        endDateFilter.lte = new Date(params.dateTo);
+      }
+      where.endDate = endDateFilter;
+    }
+
+    const documents = await prisma.document.findMany({
+      where,
+      include: {
+        customer: {
+          select: { id: true, firstName: true, secondName: true, phoneNumber: true, vehicleNumber: true },
+        },
+      },
+      orderBy: { endDate: 'asc' },
+    });
+
+    // Enrich with computed status
+    let enriched = documents.map((doc) => ({
+      ...DocumentStatusService.enrichDocumentWithStatus(doc),
+      customer: doc.customer,
+    }));
+
+    // Post-query filter by status (since status is computed, not stored)
+    if (params.status) {
+      enriched = enriched.filter((doc) => doc.status === params.status);
+    }
+
+    // Manual pagination after status filtering
+    const total = enriched.length;
+    const paginatedData = enriched.slice(skip, skip + limit);
+
+    return {
+      data: paginatedData,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  /**
+   * Get documents eligible for pre-renewal (more than 30 days remaining).
+   * Only returns documents from active customers.
+   */
+  static async getPreRenewalDocuments(limit: number = 50) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const thirtyDaysFromNow = new Date(today);
+    thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+
+    const documents = await prisma.document.findMany({
+      where: {
+        isActive: true,
+        isCurrent: true,
+        endDate: {
+          gt: thirtyDaysFromNow,
+        },
+        customer: { isActive: true },
+      },
+      include: {
+        customer: {
+          select: { id: true, firstName: true, secondName: true, phoneNumber: true, vehicleNumber: true },
+        },
+      },
+      orderBy: { endDate: 'asc' },
+      take: limit,
+    });
+
+    return documents.map((doc) => ({
+      ...DocumentStatusService.enrichDocumentWithStatus(doc),
+      customer: doc.customer,
+    }));
+  }
+}
