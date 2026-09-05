@@ -100,7 +100,7 @@ export class AuthService {
 
     if (storedToken.expiresAt < new Date()) {
       // Token expired — clean it up
-      await prisma.refreshToken.delete({ where: { id: storedToken.id } });
+      await prisma.refreshToken.deleteMany({ where: { id: storedToken.id } });
       throw new UnauthorizedError('Refresh token expired');
     }
 
@@ -109,7 +109,7 @@ export class AuthService {
     }
 
     // Delete old token (rotation)
-    await prisma.refreshToken.delete({ where: { id: storedToken.id } });
+    await prisma.refreshToken.deleteMany({ where: { id: storedToken.id } });
 
     // Generate new token pair
     const accessToken = generateAccessToken({

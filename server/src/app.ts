@@ -19,9 +19,24 @@ const app = express();
 
 // ── Security Middleware ──
 app.use(helmet());
+
+const corsOriginHandler = (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+  if (!origin) return callback(null, true);
+  if (
+    env.NODE_ENV === 'development' &&
+    (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:'))
+  ) {
+    return callback(null, true);
+  }
+  if (origin === env.CORS_ORIGIN) {
+    return callback(null, true);
+  }
+  callback(null, false);
+};
+
 app.use(
   cors({
-    origin: env.CORS_ORIGIN,
+    origin: corsOriginHandler,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization'],
