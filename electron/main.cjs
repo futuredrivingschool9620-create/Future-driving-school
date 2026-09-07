@@ -16,6 +16,7 @@ function startServer() {
     serverProcess = spawn(process.execPath, [serverPath], {
       env: {
         ...process.env,
+        ELECTRON_RUN_AS_NODE: '1',
         NODE_ENV: 'production',
         PORT: '3001',
       },
