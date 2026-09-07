@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { documentApi } from '../../lib/api';
 import type { FilteredDocument } from '../../types';
 import StatusBadge from '../../components/shared/StatusBadge';
+import ExportDocumentsModal from './ExportDocumentsModal';
 
 export default function DocumentsPage() {
   const [documents, setDocuments] = useState<FilteredDocument[]>([]);
@@ -12,6 +13,9 @@ export default function DocumentsPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
+
+  // Export modal state
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
   // Renewal state
   const [renewingDoc, setRenewingDoc] = useState<FilteredDocument | null>(null);
@@ -117,6 +121,17 @@ export default function DocumentsPage() {
             <option value="EXPIRED">Expired</option>
             <option value="ACTIVE">Active</option>
           </select>
+
+          <button
+            type="button"
+            onClick={() => setIsExportModalOpen(true)}
+            className="flex items-center gap-2 px-3.5 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-xl text-sm font-semibold transition-all shadow-md shadow-indigo-500/20 hover:scale-105 active:scale-95 cursor-pointer shrink-0"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+            </svg>
+            Export Documents
+          </button>
         </div>
       </div>
 
@@ -338,6 +353,11 @@ export default function DocumentsPage() {
           </div>
         </div>
       )}
+      {/* Export Documents Modal */}
+      <ExportDocumentsModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+      />
     </div>
   );
 }

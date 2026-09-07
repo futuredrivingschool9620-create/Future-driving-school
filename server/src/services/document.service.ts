@@ -334,6 +334,7 @@ export class DocumentService {
     status?: string;
     dateFrom?: string;
     dateTo?: string;
+    dateType?: 'endDate' | 'startDate';
     page?: number;
     limit?: number;
   }) {
@@ -348,14 +349,22 @@ export class DocumentService {
     }
 
     if (params.dateFrom || params.dateTo) {
-      const endDateFilter: Record<string, Date> = {};
+      const rangeFilter: Record<string, Date> = {};
       if (params.dateFrom) {
-        endDateFilter.gte = new Date(params.dateFrom);
+        const fromDate = new Date(params.dateFrom);
+        fromDate.setHours(0, 0, 0, 0);
+        rangeFilter.gte = fromDate;
       }
       if (params.dateTo) {
-        endDateFilter.lte = new Date(params.dateTo);
+        const toDate = new Date(params.dateTo);
+        toDate.setHours(23, 59, 59, 999);
+        rangeFilter.lte = toDate;
       }
-      where.endDate = endDateFilter;
+      if (params.dateType === 'startDate') {
+        where.startDate = rangeFilter;
+      } else {
+        where.endDate = rangeFilter;
+      }
     }
 
     const documents = await prisma.document.findMany({

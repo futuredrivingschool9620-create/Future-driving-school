@@ -216,6 +216,7 @@ export interface DashboardFilters {
   status?: string;
   dateFrom?: string;
   dateTo?: string;
+  dateType?: 'endDate' | 'startDate';
   page?: number;
   limit?: number;
 }

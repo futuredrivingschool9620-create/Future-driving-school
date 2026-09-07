@@ -72,6 +72,7 @@ export class DocumentController {
         status: getQuery(req, 'status'),
         dateFrom: getQuery(req, 'dateFrom'),
         dateTo: getQuery(req, 'dateTo'),
+        dateType: getQuery(req, 'dateType') as 'endDate' | 'startDate' | undefined,
         page: parseInt(getQuery(req, 'page') || '1'),
         limit: parseInt(getQuery(req, 'limit') || '20'),
       });
