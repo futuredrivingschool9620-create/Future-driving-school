@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { dashboardApi } from '../../lib/api';
 import type { DashboardStats, FilteredDocument } from '../../types';
+import { useSSE } from '../../hooks/useSSE';
 import StatusBadge from '../../components/shared/StatusBadge';
 
 const QUICK_LINKS = [
@@ -77,6 +78,14 @@ export default function HomePage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Real-time updates via SSE
+  useSSE((event) => {
+    if (event.type === 'CUSTOMER_UPDATE' || event.type === 'DOCUMENT_UPDATE') {
+      console.log('Real-time event received, reloading dashboard data...');
+      loadData();
+    }
+  });
 
   const handleTriggerCheck = async () => {
     try {

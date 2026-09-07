@@ -3,6 +3,7 @@ import { z } from 'zod';
 export const loginSchema = z.object({
   username: z.string().min(1, 'Username is required').max(100),
   password: z.string().min(1, 'Password is required').max(200),
+  rememberMe: z.boolean().optional().default(false),
 });
 
 export const changePasswordSchema = z.object({

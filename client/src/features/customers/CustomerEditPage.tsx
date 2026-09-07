@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { customerApi, documentApi } from '../../lib/api';
+import { validateAndFormatVehicleNumber } from '../../lib/vehicleValidation';
 
 export default function CustomerEditPage() {
   const { id } = useParams<{ id: string }>();
@@ -15,6 +16,7 @@ export default function CustomerEditPage() {
   const [vehicleType, setVehicleType] = useState<'2 Wheeler' | '4 Wheeler' | 'Truck'>('4 Wheeler');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [vehicleNumber, setVehicleNumber] = useState('');
+  const [vehicleError, setVehicleError] = useState('');
   const [remarks, setRemarks] = useState('');
 
   // New document (optional addition during edit)
@@ -55,6 +57,14 @@ export default function CustomerEditPage() {
     setError('');
     setIsSubmitting(true);
 
+    const vResult = validateAndFormatVehicleNumber(vehicleNumber);
+    if (!vResult.valid) {
+      setVehicleError(vResult.error || 'Invalid vehicle number');
+      setError(vResult.error || 'Invalid vehicle number');
+      setIsSubmitting(false);
+      return;
+    }
+
     try {
       // 1. Update customer details
       await customerApi.update(id, {
@@ -62,7 +72,7 @@ export default function CustomerEditPage() {
         secondName: secondName.trim() || undefined,
         vehicleType,
         phoneNumber: phoneNumber.trim(),
-        vehicleNumber: vehicleNumber.replace(/[\s\-]/g, '').trim(),
+        vehicleNumber: vResult.formatted || vehicleNumber.trim().toUpperCase(),
         remarks: remarks.trim() || undefined,
       });
 
@@ -152,16 +162,32 @@ export default function CustomerEditPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Vehicle Number</label>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Vehicle Number *</label>
               <input
                 type="text"
                 required
-                pattern="^([A-Z]{2})[\s\-]*([0-9]{1,2})[\s\-]*([A-Z]{1,3})[\s\-]*([0-9]{1,4})$"
-                title="Please enter a valid Indian vehicle registration number."
                 value={vehicleNumber}
-                onChange={e => setVehicleNumber(e.target.value.toUpperCase())}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 focus:ring-2 focus:ring-teal-500 uppercase font-mono"
+                onChange={e => {
+                  setVehicleNumber(e.target.value.toUpperCase());
+                  if (vehicleError) setVehicleError('');
+                }}
+                onBlur={() => {
+                  if (vehicleNumber.trim()) {
+                    const res = validateAndFormatVehicleNumber(vehicleNumber);
+                    if (res.valid && res.formatted) {
+                      setVehicleNumber(res.formatted);
+                      setVehicleError('');
+                    } else {
+                      setVehicleError(res.error || '');
+                    }
+                  }
+                }}
+                className={`w-full px-4 py-3 rounded-xl border ${vehicleError ? 'border-rose-500 ring-1 ring-rose-500' : 'border-slate-200 dark:border-slate-700'} bg-white dark:bg-slate-900 focus:ring-2 focus:ring-teal-500 uppercase font-mono`}
+                placeholder="KA 01 AB 1234"
               />
+              {vehicleError && (
+                <p className="mt-1.5 text-xs text-rose-500 font-medium">{vehicleError}</p>
+              )}
             </div>
           </div>
 

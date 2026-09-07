@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { customerApi, documentApi } from '../../lib/api';
 import type { Customer, FilteredDocument, DashboardFilters } from '../../types';
 import StatusBadge from '../../components/shared/StatusBadge';
+import { useSSE } from '../../hooks/useSSE';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All Statuses' },
@@ -90,13 +91,24 @@ export default function DashboardPage() {
     }
   }, [filters, filterPagination.page]);
 
-  // Clear all filters
   const clearFilters = () => {
     setFilters({});
     setFilterResults([]);
     setFilterPagination({ page: 1, totalPages: 1, total: 0 });
     setMode('idle');
   };
+
+  // Real-time updates via SSE
+  useSSE((event) => {
+    if (event.type === 'CUSTOMER_UPDATE' || event.type === 'DOCUMENT_UPDATE') {
+      console.log('Real-time event received, reloading search/filter data...');
+      if (mode === 'search' && searchQuery.trim()) {
+        customerApi.search(searchQuery.trim()).then(r => setSearchResults(r.data)).catch(console.error);
+      } else if (mode === 'filter') {
+        documentApi.filter({ ...filters, page: filterPagination.page }).then(r => setFilterResults(r.data)).catch(console.error);
+      }
+    }
+  });
 
   const hasActiveFilters = filters.documentName || filters.status || filters.dateFrom || filters.dateTo;
   const activeFilterCount = [filters.documentName, filters.status, filters.dateFrom, filters.dateTo].filter(Boolean).length;
@@ -522,6 +534,11 @@ export default function DashboardPage() {
                       </svg>
                       <span>{new Date(doc.endDate).toLocaleDateString('en-IN')}</span>
                     </p>
+                    {doc.notes && (
+                      <p className="text-[11px] mt-1 text-slate-500 italic truncate" title={doc.notes}>
+                        <span className="font-semibold text-slate-600 dark:text-slate-400 not-italic">Note:</span> {doc.notes}
+                      </p>
+                    )}
                   </div>
                   <StatusBadge status={doc.status} daysRemaining={doc.daysRemaining} compact />
                   <svg

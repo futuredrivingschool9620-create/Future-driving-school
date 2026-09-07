@@ -2,8 +2,8 @@ import { prisma } from '../lib/prisma.js';
 import { NotFoundError } from '../utils/errors.js';
 import { AuditService } from './audit.service.js';
 import { DocumentStatusService } from './documentStatus.service.js';
-import type { CreateCustomerInput, UpdateCustomerInput } from '../validators/customer.schema.js';
-
+import { type CreateCustomerInput, type UpdateCustomerInput, validateAndFormatVehicleNumber } from '../validators/customer.schema.js';
+import { SSEService } from './sse.service.js';
 function formatFullName(firstName: string, secondName?: string | null): string {
   return [firstName, secondName].filter(Boolean).join(' ').trim() || firstName;
 }
@@ -143,6 +143,10 @@ export class CustomerService {
       });
     }
 
+    if (customer) {
+      SSEService.broadcast({ type: 'CUSTOMER_UPDATE', data: { customerId: customer.id } });
+    }
+
     return customer
       ? {
           ...customer,
@@ -186,6 +190,8 @@ export class CustomerService {
       newData: updated as unknown as Record<string, unknown>,
       ipAddress,
     });
+
+    SSEService.broadcast({ type: 'CUSTOMER_UPDATE', data: { customerId: id } });
 
     return {
       ...updated,
@@ -240,6 +246,8 @@ export class CustomerService {
       ipAddress,
     });
 
+    SSEService.broadcast({ type: 'CUSTOMER_UPDATE', data: { customerId: id } });
+
     return { message: 'Customer and all associated documents deleted successfully' };
   }
 
@@ -254,14 +262,26 @@ export class CustomerService {
       return { data: [], pagination: { page, limit, total: 0, totalPages: 0 } };
     }
 
+    const orConditions: any[] = [
+      { firstName: { contains: searchTerm, mode: 'insensitive' as const } },
+      { secondName: { contains: searchTerm, mode: 'insensitive' as const } },
+      { phoneNumber: { contains: searchTerm, mode: 'insensitive' as const } },
+      { vehicleNumber: { contains: searchTerm, mode: 'insensitive' as const } },
+    ];
+
+    const cleanedTerm = searchTerm.replace(/[\s\-]/g, '');
+    if (cleanedTerm && cleanedTerm.toLowerCase() !== searchTerm.toLowerCase()) {
+      orConditions.push({ vehicleNumber: { contains: cleanedTerm, mode: 'insensitive' as const } });
+    }
+
+    const formattedTerm = validateAndFormatVehicleNumber(searchTerm);
+    if (formattedTerm.valid && formattedTerm.formatted && formattedTerm.formatted.toLowerCase() !== searchTerm.toLowerCase()) {
+      orConditions.push({ vehicleNumber: { contains: formattedTerm.formatted, mode: 'insensitive' as const } });
+    }
+
     const where = {
       isActive: true,
-      OR: [
-        { firstName: { contains: searchTerm, mode: 'insensitive' as const } },
-        { secondName: { contains: searchTerm, mode: 'insensitive' as const } },
-        { phoneNumber: { contains: searchTerm, mode: 'insensitive' as const } },
-        { vehicleNumber: { contains: searchTerm, mode: 'insensitive' as const } },
-      ],
+      OR: orConditions,
     };
 
     const [customers, total] = await Promise.all([

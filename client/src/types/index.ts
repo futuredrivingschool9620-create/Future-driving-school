@@ -227,6 +227,7 @@ export interface FilteredDocument extends DocumentWithStatus {
     secondName: string;
     phoneNumber: string;
     vehicleNumber: string;
+    remarks?: string | null;
   };
 }
 

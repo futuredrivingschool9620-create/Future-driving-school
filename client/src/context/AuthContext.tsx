@@ -6,7 +6,7 @@ interface AuthContextType {
   admin: AdminProfile | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (username: string, password: string) => Promise<void>;
+  login: (username: string, password: string, rememberMe?: boolean) => Promise<void>;
   logout: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -45,8 +45,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     initAuth();
   }, [refreshProfile]);
 
-  const login = async (username: string, password: string) => {
-    await authApi.login(username, password);
+  const login = async (username: string, password: string, rememberMe: boolean = false) => {
+    await authApi.login(username, password, rememberMe);
     await refreshProfile();
   };
 

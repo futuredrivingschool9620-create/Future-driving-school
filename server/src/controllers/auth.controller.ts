@@ -6,7 +6,7 @@ import { getIp } from '../utils/express.js';
 export class AuthController {
   static async login(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { username, password } = req.body;
+      const { username, password, rememberMe } = req.body;
       const ipAddress = getIp(req);
 
       const { accessToken, refreshToken } = await AuthService.login(
@@ -16,13 +16,25 @@ export class AuthController {
       );
 
       // Set refresh token in HttpOnly cookie
-      res.cookie('refreshToken', refreshToken, {
+      // When rememberMe is false, omit maxAge to create a session cookie (cleared on browser close)
+      const cookieOptions: {
+        httpOnly: boolean;
+        secure: boolean;
+        sameSite: 'strict';
+        path: string;
+        maxAge?: number;
+      } = {
         httpOnly: true,
         secure: env.NODE_ENV === 'production',
         sameSite: 'strict',
-        maxAge: env.JWT_REFRESH_EXPIRY_DAYS * 24 * 60 * 60 * 1000,
         path: '/api/auth',
-      });
+      };
+
+      if (rememberMe) {
+        cookieOptions.maxAge = env.JWT_REFRESH_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
+      }
+
+      res.cookie('refreshToken', refreshToken, cookieOptions);
 
       res.json({ accessToken });
     } catch (error) {

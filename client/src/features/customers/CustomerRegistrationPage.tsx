@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { customerApi } from '../../lib/api';
+import { validateAndFormatVehicleNumber } from '../../lib/vehicleValidation';
 
 interface DocumentInput {
   id: string; // for internal React key
@@ -20,6 +21,7 @@ export default function CustomerRegistrationPage() {
   const [vehicleType, setVehicleType] = useState<'2 Wheeler' | '4 Wheeler' | 'Truck'>('4 Wheeler');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [vehicleNumber, setVehicleNumber] = useState('');
+  const [vehicleError, setVehicleError] = useState('');
   const [remarks, setRemarks] = useState('');
 
   // Documents
@@ -49,6 +51,14 @@ export default function CustomerRegistrationPage() {
     setError('');
     setIsSubmitting(true);
 
+    const vResult = validateAndFormatVehicleNumber(vehicleNumber);
+    if (!vResult.valid) {
+      setVehicleError(vResult.error || 'Invalid vehicle number');
+      setError(vResult.error || 'Invalid vehicle number');
+      setIsSubmitting(false);
+      return;
+    }
+
     try {
       // Filter out empty documents (must have name and both dates)
       const validDocuments = documents
@@ -64,7 +74,7 @@ export default function CustomerRegistrationPage() {
         secondName: secondName.trim() || undefined,
         vehicleType,
         phoneNumber: phoneNumber.trim(),
-        vehicleNumber: vehicleNumber.replace(/[\s\-]/g, '').trim(),
+        vehicleNumber: vResult.formatted || vehicleNumber.trim().toUpperCase(),
         remarks: remarks.trim() || undefined,
         documents: validDocuments,
       });
@@ -159,13 +169,28 @@ export default function CustomerRegistrationPage() {
               <input
                 type="text"
                 required
-                pattern="^([A-Z]{2})[\s\-]*([0-9]{1,2})[\s\-]*([A-Z]{1,3})[\s\-]*([0-9]{1,4})$"
-                title="Please enter a valid Indian vehicle registration number."
                 value={vehicleNumber}
-                onChange={e => setVehicleNumber(e.target.value.toUpperCase())}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-colors uppercase font-mono"
+                onChange={e => {
+                  setVehicleNumber(e.target.value.toUpperCase());
+                  if (vehicleError) setVehicleError('');
+                }}
+                onBlur={() => {
+                  if (vehicleNumber.trim()) {
+                    const res = validateAndFormatVehicleNumber(vehicleNumber);
+                    if (res.valid && res.formatted) {
+                      setVehicleNumber(res.formatted);
+                      setVehicleError('');
+                    } else {
+                      setVehicleError(res.error || '');
+                    }
+                  }
+                }}
+                className={`w-full px-4 py-3 rounded-xl border ${vehicleError ? 'border-rose-500 ring-1 ring-rose-500' : 'border-slate-200 dark:border-slate-700'} bg-white dark:bg-slate-900 focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-colors uppercase font-mono`}
                 placeholder="KA 01 AB 1234"
               />
+              {vehicleError && (
+                <p className="mt-1.5 text-xs text-rose-500 font-medium">{vehicleError}</p>
+              )}
             </div>
           </div>
 

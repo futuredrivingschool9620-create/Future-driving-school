@@ -136,6 +136,9 @@ export default function DocumentsPage() {
                   Validity Range
                 </th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                  Notes / Remarks
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                   Status
                 </th>
                 <th className="px-6 py-4 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
@@ -146,14 +149,14 @@ export default function DocumentsPage() {
             <tbody className="divide-y divide-slate-200 dark:divide-slate-700 bg-white/50 dark:bg-slate-900/50">
               {isLoading ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center">
+                  <td colSpan={6} className="px-6 py-12 text-center">
                     <div className="inline-block w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
                     <p className="mt-4 text-slate-500">Loading documents...</p>
                   </td>
                 </tr>
               ) : documents.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center">
+                  <td colSpan={6} className="px-6 py-12 text-center">
                     <p className="text-slate-900 dark:text-white font-medium text-lg">No documents found</p>
                     <p className="text-slate-500 mt-1">Try adjusting the filter criteria.</p>
                   </td>
@@ -187,6 +190,23 @@ export default function DocumentsPage() {
                       <div className="font-semibold text-slate-900 dark:text-slate-200 mt-0.5">
                         Expiry: {new Date(doc.endDate).toLocaleDateString('en-IN')}
                       </div>
+                    </td>
+                    <td className="px-6 py-4 text-xs text-slate-600 dark:text-slate-400 max-w-xs">
+                      {doc.notes ? (
+                        <div className="flex items-start gap-1">
+                          <span className="font-semibold text-slate-700 dark:text-slate-300 shrink-0">Doc:</span>
+                          <span className="truncate" title={doc.notes}>{doc.notes}</span>
+                        </div>
+                      ) : null}
+                      {doc.customer?.remarks ? (
+                        <div className={`flex items-start gap-1 ${doc.notes ? 'mt-1' : ''} text-amber-600 dark:text-amber-400`}>
+                          <span className="font-semibold shrink-0">Cust:</span>
+                          <span className="truncate" title={doc.customer.remarks}>{doc.customer.remarks}</span>
+                        </div>
+                      ) : null}
+                      {!doc.notes && !doc.customer?.remarks && (
+                        <span className="text-slate-400 dark:text-slate-600 italic">—</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <StatusBadge status={doc.status} daysRemaining={doc.daysRemaining} />

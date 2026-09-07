@@ -41,7 +41,7 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      await login(username, password);
+      await login(username, password, rememberMe);
     } catch (err: unknown) {
       const message =
         err && typeof err === 'object' && 'response' in err
