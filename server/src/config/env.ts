@@ -1,4 +1,32 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const candidates = [
+  process.env.DOTENV_CONFIG_PATH,
+  path.resolve(process.cwd(), '.env'),
+  path.resolve(process.cwd(), 'server', '.env'),
+  path.resolve(__dirname, '..', '..', '.env'),
+  path.resolve(__dirname, '..', '.env'),
+  (process as any).resourcesPath ? path.join((process as any).resourcesPath, 'server', '.env') : null,
+  (process as any).resourcesPath ? path.join((process as any).resourcesPath, '.env') : null,
+].filter(Boolean) as string[];
+
+let loaded = false;
+for (const p of candidates) {
+  if (fs.existsSync(p)) {
+    dotenv.config({ path: p });
+    loaded = true;
+    break;
+  }
+}
+if (!loaded) {
+  dotenv.config();
+}
 import { z } from 'zod';
 
 const envSchema = z.object({

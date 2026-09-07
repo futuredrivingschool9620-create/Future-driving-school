@@ -21,7 +21,7 @@ const app = express();
 app.use(helmet());
 
 const corsOriginHandler = (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-  if (!origin) return callback(null, true);
+  if (!origin || origin === 'null' || origin.startsWith('file://')) return callback(null, true);
   if (
     origin.startsWith('http://localhost:') ||
     origin.startsWith('http://127.0.0.1:') ||
