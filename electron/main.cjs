@@ -81,6 +81,7 @@ function waitForServer(callback, maxAttempts = 30) {
 }
 
 function createWindow() {
+  const appIcon = path.join(__dirname, 'icon.png');
   mainWindow = new BrowserWindow({
     width: 1380,
     height: 900,
@@ -88,6 +89,7 @@ function createWindow() {
     minHeight: 700,
     title: 'Future Driving School',
     backgroundColor: '#0f172a',
+    icon: appIcon,
     show: false,
     autoHideMenuBar: true,
     webPreferences: {
