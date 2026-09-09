@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { customerApi, documentApi } from '../../lib/api';
 import { validateAndFormatVehicleNumber } from '../../lib/vehicleValidation';
+import { validatePhoneNumber, sanitizePhoneInput } from '../../lib/phoneValidation';
 
 export default function CustomerEditPage() {
   const { id } = useParams<{ id: string }>();
@@ -15,6 +16,7 @@ export default function CustomerEditPage() {
   const [secondName, setSecondName] = useState('');
   const [vehicleType, setVehicleType] = useState<'2 Wheeler' | '4 Wheeler' | 'Truck'>('4 Wheeler');
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [phoneError, setPhoneError] = useState('');
   const [vehicleNumber, setVehicleNumber] = useState('');
   const [vehicleError, setVehicleError] = useState('');
   const [remarks, setRemarks] = useState('');
@@ -57,6 +59,15 @@ export default function CustomerEditPage() {
     setError('');
     setIsSubmitting(true);
 
+    const pResult = validatePhoneNumber(phoneNumber);
+    if (!pResult.valid) {
+      setPhoneError(pResult.error || 'Invalid mobile number');
+      setError(pResult.error || 'Invalid mobile number');
+      setIsSubmitting(false);
+      return;
+    }
+    setPhoneError('');
+
     const vResult = validateAndFormatVehicleNumber(vehicleNumber);
     if (!vResult.valid) {
       setVehicleError(vResult.error || 'Invalid vehicle number');
@@ -71,7 +82,7 @@ export default function CustomerEditPage() {
         firstName: firstName.trim(),
         secondName: secondName.trim() || undefined,
         vehicleType,
-        phoneNumber: phoneNumber.trim(),
+        phoneNumber: pResult.clean || phoneNumber.trim(),
         vehicleNumber: vResult.formatted || vehicleNumber.trim().toUpperCase(),
         remarks: remarks.trim() || undefined,
       });
@@ -149,17 +160,40 @@ export default function CustomerEditPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Phone Number</label>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Phone Number *</label>
               <input
                 type="tel"
                 required
-                pattern="^[6-9][0-9]{9}$"
-                title="Please enter a valid 10-digit Indian mobile number."
                 maxLength={10}
                 value={phoneNumber}
-                onChange={e => setPhoneNumber(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 focus:ring-2 focus:ring-teal-500"
+                onChange={e => {
+                  const sanitized = sanitizePhoneInput(e.target.value);
+                  setPhoneNumber(sanitized);
+                  if (phoneError) setPhoneError('');
+                }}
+                onBlur={() => {
+                  if (phoneNumber.trim()) {
+                    const res = validatePhoneNumber(phoneNumber);
+                    if (!res.valid) {
+                      setPhoneError(res.error || 'Invalid mobile number');
+                    } else {
+                      setPhoneError('');
+                    }
+                  }
+                }}
+                className={`w-full px-4 py-3 rounded-xl border ${
+                  phoneError ? 'border-rose-500 ring-1 ring-rose-500' : 'border-slate-200 dark:border-slate-700'
+                } bg-white dark:bg-slate-900 focus:ring-2 focus:ring-teal-500 font-mono`}
               />
+              {phoneError ? (
+                <p className="mt-1.5 text-xs text-rose-500 font-medium">{phoneError}</p>
+              ) : phoneNumber.length === 10 && /^[6-9]/.test(phoneNumber) ? (
+                <p className="mt-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                  Valid 10-digit Indian mobile number
+                </p>
+              ) : (
+                <p className="mt-1 text-[11px] text-slate-500">10-digit Indian mobile number (starts with 6-9)</p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Vehicle Number *</label>

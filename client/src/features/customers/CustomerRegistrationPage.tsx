@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { customerApi } from '../../lib/api';
 import { validateAndFormatVehicleNumber } from '../../lib/vehicleValidation';
+import { validatePhoneNumber, sanitizePhoneInput } from '../../lib/phoneValidation';
 import UploadedPdfSection from './UploadedPdfSection';
 import type { Customer } from '../../types';
 
@@ -58,6 +59,7 @@ export default function CustomerRegistrationPage() {
   const [firstName, setFirstName] = useState('');
   const [secondName, setSecondName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [phoneError, setPhoneError] = useState('');
   const [remarks, setRemarks] = useState('');
 
   // Existing customer check
@@ -177,6 +179,15 @@ export default function CustomerRegistrationPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    // Validate phone number
+    const phoneResult = validatePhoneNumber(phoneNumber);
+    if (!phoneResult.valid) {
+      setPhoneError(phoneResult.error || 'Invalid mobile number');
+      setError(phoneResult.error || 'Please enter a valid 10-digit Indian mobile number.');
+      return;
+    }
+    setPhoneError('');
 
     // Validate all vehicle numbers
     let hasVehicleError = false;
@@ -371,19 +382,47 @@ export default function CustomerRegistrationPage() {
                     <input
                       type="tel"
                       required
-                      pattern="^[6-9][0-9]{9}$"
-                      title="Please enter a valid 10-digit Indian mobile number."
                       maxLength={10}
                       value={phoneNumber}
-                      onChange={(e) => setPhoneNumber(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors font-mono"
+                      onChange={(e) => {
+                        const sanitized = sanitizePhoneInput(e.target.value);
+                        setPhoneNumber(sanitized);
+                        if (phoneError) setPhoneError('');
+                      }}
+                      onBlur={() => {
+                        if (phoneNumber.trim()) {
+                          const res = validatePhoneNumber(phoneNumber);
+                          if (!res.valid) {
+                            setPhoneError(res.error || 'Invalid mobile number');
+                          } else {
+                            setPhoneError('');
+                          }
+                        }
+                      }}
+                      className={`w-full px-4 py-3 rounded-xl border ${
+                        phoneError ? 'border-rose-500 ring-1 ring-rose-500' : 'border-slate-200 dark:border-slate-700'
+                      } bg-white dark:bg-slate-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors font-mono font-medium`}
                       placeholder="9876543210"
                     />
-                    {isCheckingPhone && (
+                    {isCheckingPhone ? (
                       <div className="absolute right-3 top-3.5 w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-                    )}
+                    ) : phoneNumber.length === 10 && /^[6-9]/.test(phoneNumber) ? (
+                      <div className="absolute right-3 top-3.5 text-emerald-500 font-bold text-sm">
+                        ✓
+                      </div>
+                    ) : null}
                   </div>
-                  <p className="mt-1 text-[11px] text-slate-500">10-digit Indian mobile number</p>
+                  {phoneError ? (
+                    <p className="mt-1.5 text-xs text-rose-500 font-medium">{phoneError}</p>
+                  ) : phoneNumber.length === 10 && /^[6-9]/.test(phoneNumber) ? (
+                    <p className="mt-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                      Valid 10-digit Indian mobile number
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      10-digit Indian mobile number (starts with 6, 7, 8, 9) {phoneNumber ? `• ${phoneNumber.length}/10` : ''}
+                    </p>
+                  )}
                 </div>
 
                 <div>

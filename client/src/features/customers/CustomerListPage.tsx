@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { customerApi } from '../../lib/api';
+import { validatePhoneNumber } from '../../lib/phoneValidation';
+import { validateAndFormatVehicleNumber } from '../../lib/vehicleValidation';
 import type { Customer, DocumentWithStatus } from '../../types';
 import StatusBadge from '../../components/shared/StatusBadge';
 
@@ -255,36 +257,54 @@ export default function CustomerListPage() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className={`text-sm inline-flex items-center gap-1.5 ${
-                          isSameName
-                            ? 'px-2.5 py-1 rounded-lg bg-amber-100/90 dark:bg-amber-950/80 border-2 border-amber-500 text-amber-900 dark:text-amber-200 font-mono font-bold shadow-xs'
-                            : 'text-slate-900 dark:text-slate-300'
-                        }`}>
-                          <span>{customer.phoneNumber}</span>
+                        <div className="flex flex-col gap-1">
+                          <div className={`text-sm inline-flex items-center gap-1.5 ${
+                            isSameName
+                              ? 'px-2.5 py-1 rounded-lg bg-amber-100/90 dark:bg-amber-950/80 border-2 border-amber-500 text-amber-900 dark:text-amber-200 font-mono font-bold shadow-xs'
+                              : 'text-slate-900 dark:text-slate-300 font-mono'
+                          }`}>
+                            <span>{customer.phoneNumber}</span>
+                          </div>
+                          {!validatePhoneNumber(customer.phoneNumber).valid && (
+                            <span
+                              className="text-[10px] font-semibold text-rose-600 dark:text-rose-400 flex items-center gap-1"
+                              title={validatePhoneNumber(customer.phoneNumber).error}
+                            >
+                              <span>⚠️</span> Invalid Mobile
+                            </span>
+                          )}
                         </div>
                       </td>
                     <td className="px-6 py-4">
                       {customer.vehicles && customer.vehicles.length > 0 ? (
                         <div className="flex flex-col gap-2">
-                          {customer.vehicles.map((v) => (
-                            <div key={v.id} className="flex items-center gap-1.5 flex-wrap">
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-xs font-bold font-mono text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700">
-                                {v.vehicleNumber}
-                              </span>
-                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                                {v.vehicleType}
-                              </span>
-                              <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-                                v.status === 'Active'
-                                  ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
-                                  : v.status === 'Expired'
-                                  ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-200 dark:border-rose-800'
-                                  : 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800'
-                              }`}>
-                                {v.status}
-                              </span>
-                            </div>
-                          ))}
+                          {customer.vehicles.map((v) => {
+                            const vValid = validateAndFormatVehicleNumber(v.vehicleNumber).valid;
+                            return (
+                              <div key={v.id} className="flex items-center gap-1.5 flex-wrap">
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold font-mono border ${
+                                  vValid
+                                    ? 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700'
+                                    : 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-300 dark:border-rose-800'
+                                }`} title={!vValid ? 'Invalid vehicle registration format' : undefined}>
+                                  {v.vehicleNumber}
+                                  {!vValid && <span className="ml-1 text-[9px]">⚠️</span>}
+                                </span>
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                                  {v.vehicleType}
+                                </span>
+                                <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                  v.status === 'Active'
+                                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
+                                    : v.status === 'Expired'
+                                    ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-200 dark:border-rose-800'
+                                    : 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800'
+                                }`}>
+                                  {v.status}
+                                </span>
+                              </div>
+                            );
+                          })}
                         </div>
                       ) : (
                         <div className="flex items-center gap-2">

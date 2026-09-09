@@ -68,11 +68,33 @@ export const vehicleItemInputSchema = z.object({
   documents: z.array(documentInputSchema).optional(),
 });
 
+export function validatePhoneNumber(input: string): { valid: boolean; clean?: string; error?: string } {
+  if (!input || !input.trim()) {
+    return { valid: false, error: 'Mobile number is required' };
+  }
+  let digits = input.trim().replace(/\D/g, '');
+  if (digits.length === 12 && digits.startsWith('91')) {
+    digits = digits.slice(2);
+  } else if (digits.length === 11 && digits.startsWith('0')) {
+    digits = digits.slice(1);
+  }
+  if (digits.length !== 10) {
+    return { valid: false, error: `Mobile number must be exactly 10 digits (${digits.length}/10 entered)` };
+  }
+  if (!/^[6-9]/.test(digits)) {
+    return { valid: false, error: 'Indian mobile number must start with 6, 7, 8, or 9' };
+  }
+  return { valid: true, clean: digits };
+}
+
 export const createCustomerSchema = z.object({
   firstName: z.string().min(1, 'First name is required').max(100),
   secondName: z.string().max(100).optional().or(z.literal('')),
   vehicleType: z.enum(['2 Wheeler', '4 Wheeler', 'Truck']).optional().or(z.literal('')).or(z.null()),
-  phoneNumber: z.string().min(5, 'Phone number is required').max(20),
+  phoneNumber: z.string().min(1, 'Phone number is required').refine(
+    (val) => validatePhoneNumber(val).valid,
+    (val) => ({ message: validatePhoneNumber(val).error || 'Invalid 10-digit Indian mobile number' })
+  ).transform((val) => validatePhoneNumber(val).clean || val.trim()),
   vehicleNumber: z.string().max(25).optional().or(z.literal('')).or(z.null()),
   remarks: z.string().max(500).optional(),
   documents: z.array(documentInputSchema).optional(),
@@ -83,7 +105,10 @@ export const updateCustomerSchema = z.object({
   firstName: z.string().min(1).max(100).optional(),
   secondName: z.string().max(100).optional().or(z.literal('')).or(z.null()),
   vehicleType: z.enum(['2 Wheeler', '4 Wheeler', 'Truck']).optional().or(z.literal('')).or(z.null()),
-  phoneNumber: z.string().min(5).max(20).optional(),
+  phoneNumber: z.string().min(1).refine(
+    (val) => validatePhoneNumber(val).valid,
+    (val) => ({ message: validatePhoneNumber(val).error || 'Invalid 10-digit Indian mobile number' })
+  ).transform((val) => validatePhoneNumber(val).clean || val.trim()).optional(),
   vehicleNumber: z.string().min(1).max(25).refine(
     (val) => validateAndFormatVehicleNumber(val).valid,
     (val) => ({ message: validateAndFormatVehicleNumber(val).error || 'Invalid Indian vehicle number' })
