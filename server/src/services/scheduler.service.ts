@@ -60,6 +60,10 @@ export class SchedulerService {
         isActive: true,
         isCurrent: true,
         customer: { isActive: true },
+        OR: [
+          { vehicleId: null },
+          { vehicle: { isActive: true } },
+        ],
       },
       include: {
         customer: {
@@ -72,6 +76,15 @@ export class SchedulerService {
             isActive: true,
           },
         },
+        vehicle: {
+          select: {
+            id: true,
+            vehicleNumber: true,
+            vehicleType: true,
+            status: true,
+            isActive: true,
+          },
+        },
       },
     });
 
@@ -80,8 +93,8 @@ export class SchedulerService {
     let skipped = 0;
 
     for (const doc of documents) {
-      // Skip if customer is inactive
-      if (!doc.customer.isActive) {
+      // Skip if customer is inactive or vehicle is inactive
+      if (!doc.customer.isActive || (doc.vehicle && !doc.vehicle.isActive)) {
         skipped++;
         continue;
       }
@@ -95,6 +108,7 @@ export class SchedulerService {
       }
 
       const customerName = `${doc.customer.firstName} ${doc.customer.secondName}`;
+      const targetVehicleNumber = doc.vehicle?.vehicleNumber || doc.customer.vehicleNumber || 'Vehicle';
 
       // Check for duplicate notification
       const isDuplicate = await NotificationService.isDuplicate(
@@ -114,7 +128,7 @@ export class SchedulerService {
       const message = this.buildMessage(
         customerName,
         doc.documentName,
-        doc.customer.vehicleNumber,
+        targetVehicleNumber,
         daysRemaining,
         formatDateIN(doc.endDate)
       );
@@ -122,10 +136,11 @@ export class SchedulerService {
       // Create notification record
       const notification = await NotificationService.createNotification({
         customerId: doc.customerId,
+        vehicleId: doc.vehicleId || undefined,
         documentId: doc.id,
         customerName,
         phoneNumber: doc.customer.phoneNumber,
-        vehicleNumber: doc.customer.vehicleNumber,
+        vehicleNumber: targetVehicleNumber,
         documentType: doc.documentName,
         originalExpiryDate: doc.endDate,
         currentExpiryDate: doc.endDate,

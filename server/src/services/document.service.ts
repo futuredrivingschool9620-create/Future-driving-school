@@ -12,7 +12,7 @@ export class DocumentService {
    */
   static async create(
     customerId: string,
-    data: CreateDocumentInput,
+    data: CreateDocumentInput & { vehicleId?: string },
     adminId: string,
     ipAddress?: string
   ) {
@@ -22,12 +22,15 @@ export class DocumentService {
       throw new NotFoundError('Customer not found');
     }
 
+    const vehicleId = data.vehicleId || null;
+
     // Transaction: mark old documents as non-current, create new one
     const document = await prisma.$transaction(async (tx) => {
-      // Mark all existing current documents of the same name as non-current
+      // Mark all existing current documents of the same name for this vehicle as non-current
       await tx.document.updateMany({
         where: {
           customerId,
+          ...(vehicleId ? { vehicleId } : {}),
           documentName: data.documentName,
           isCurrent: true,
         },
@@ -38,6 +41,7 @@ export class DocumentService {
       return tx.document.create({
         data: {
           customerId,
+          vehicleId,
           documentName: data.documentName,
           startDate: new Date(data.startDate),
           endDate: new Date(data.endDate),
@@ -73,6 +77,9 @@ export class DocumentService {
         customer: {
           select: { id: true, firstName: true, secondName: true, phoneNumber: true, vehicleNumber: true },
         },
+        vehicle: {
+          select: { id: true, vehicleNumber: true, vehicleType: true, status: true, isActive: true },
+        },
         createdByAdmin: { select: { id: true, username: true } },
         updatedByAdmin: { select: { id: true, username: true } },
       },
@@ -85,6 +92,7 @@ export class DocumentService {
     return {
       ...DocumentStatusService.enrichDocumentWithStatus(document),
       customer: document.customer,
+      vehicle: document.vehicle,
       createdByAdmin: document.createdByAdmin,
       updatedByAdmin: document.updatedByAdmin,
     };
@@ -182,6 +190,7 @@ export class DocumentService {
       await tx.renewalHistory.create({
         data: {
           customerId: existing.customerId,
+          vehicleId: existing.vehicleId || null,
           documentId: existing.id,
           oldDocumentName: existing.documentName,
           oldStartDate: existing.startDate,
@@ -373,6 +382,9 @@ export class DocumentService {
         customer: {
           select: { id: true, firstName: true, secondName: true, phoneNumber: true, vehicleNumber: true, remarks: true },
         },
+        vehicle: {
+          select: { id: true, vehicleNumber: true, vehicleType: true, status: true, isActive: true },
+        },
       },
       orderBy: { endDate: 'asc' },
     });
@@ -381,6 +393,7 @@ export class DocumentService {
     let enriched = documents.map((doc) => ({
       ...DocumentStatusService.enrichDocumentWithStatus(doc),
       customer: doc.customer,
+      vehicle: doc.vehicle,
     }));
 
     // Post-query filter by status (since status is computed, not stored)

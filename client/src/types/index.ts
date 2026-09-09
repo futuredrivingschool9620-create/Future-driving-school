@@ -60,6 +60,7 @@ export interface ChangePasswordInput {
 export interface DocumentWithStatus {
   id: string;
   customerId: string;
+  vehicleId?: string | null;
   documentName: string;
   startDate: string;
   endDate: string;
@@ -88,6 +89,50 @@ export interface DocumentHistoryItem extends DocumentWithStatus {
   };
 }
 
+// ── Vehicles ──
+
+export interface Vehicle {
+  id: string;
+  customerId: string;
+  vehicleType: '2 Wheeler' | '4 Wheeler' | 'Truck' | string;
+  vehicleNumber: string;
+  status: 'Active' | 'Expired' | 'Renewed' | string;
+  isActive: boolean;
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  documents?: DocumentWithStatus[];
+  currentDocuments?: CustomerDocumentSummary;
+  allDocuments?: DocumentWithStatus[];
+  renewalHistories?: RenewalHistory[];
+  notifications?: Notification[];
+}
+
+export interface VehicleItemInput {
+  vehicleType: '2 Wheeler' | '4 Wheeler' | 'Truck';
+  vehicleNumber: string;
+  status?: 'Active' | 'Expired' | 'Renewed';
+  notes?: string;
+  insurance?: {
+    startDate: string;
+    endDate: string;
+  };
+  fc?: {
+    startDate: string;
+    endDate: string;
+  };
+  tax?: {
+    startDate: string;
+    endDate: string;
+  };
+  documents?: {
+    documentName: string;
+    startDate: string;
+    endDate: string;
+    notes?: string;
+  }[];
+}
+
 // ── Customers ──
 
 export interface Customer {
@@ -97,11 +142,14 @@ export interface Customer {
   fullName?: string;
   vehicleType?: '2 Wheeler' | '4 Wheeler' | 'Truck' | string;
   phoneNumber: string;
-  vehicleNumber: string;
+  vehicleNumber?: string;
+  drivingLicenceNumber?: string;
+  uploadedPdfId?: string;
   remarks?: string;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  vehicles?: Vehicle[];
   currentDocuments?: CustomerDocumentSummary;
   allDocuments?: DocumentWithStatus[];
 }
@@ -111,13 +159,14 @@ export interface CreateCustomerInput {
   secondName?: string;
   vehicleType?: '2 Wheeler' | '4 Wheeler' | 'Truck' | string;
   phoneNumber: string;
-  vehicleNumber: string;
+  vehicleNumber?: string;
   remarks?: string;
   documents?: {
     documentName: string;
     startDate: string;
     endDate: string;
   }[];
+  vehicles?: VehicleItemInput[];
 }
 
 export interface UpdateCustomerInput {
@@ -134,6 +183,7 @@ export interface CreateDocumentInput {
   startDate: string;
   endDate: string;
   notes?: string;
+  vehicleId?: string;
 }
 
 export interface RenewDocumentInput {
@@ -245,3 +295,80 @@ export interface RegistrationHistoryResponse {
   totalReminders: number;
   history: RegistrationHistoryItem[];
 }
+
+// ── Uploaded PDF & Batch Registration ──
+
+export interface EvaluatedCustomerRecord {
+  tempId: string;
+  firstName: string;
+  secondName?: string;
+  phoneNumber: string;
+  vehicleNumber: string;
+  vehicleType?: '2 Wheeler' | '4 Wheeler' | 'Truck';
+  documentName?: string;
+  startDate?: string;
+  endDate?: string;
+  drivingLicenceNumber?: string;
+  remarks?: string;
+  rawText?: string;
+  status: 'VALID' | 'DUPLICATE' | 'INVALID';
+  statusReason?: string;
+  matchedExistingCustomer?: {
+    id: string;
+    name: string;
+    phoneNumber: string;
+    vehicleNumber: string;
+  };
+}
+
+export interface BatchPreviewResponse {
+  fileName: string;
+  fileSize: number;
+  totalFound: number;
+  validCount: number;
+  skippedCount: number;
+  invalidCount: number;
+  records: EvaluatedCustomerRecord[];
+}
+
+export interface ConfirmBatchPayload {
+  fileName: string;
+  fileBase64: string;
+  records: EvaluatedCustomerRecord[];
+}
+
+export interface BatchConfirmResponse {
+  uploadedPdfId: string;
+  fileName: string;
+  totalFound: number;
+  registeredCount: number;
+  skippedCount: number;
+  invalidCount: number;
+  registeredCustomers: Array<{ id: string; name: string; vehicleNumber: string; phoneNumber: string }>;
+  skippedCustomers: Array<{ name: string; phone: string; vehicleNumber: string; reason: string }>;
+}
+
+export interface UploadedPdfRecord {
+  id: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  totalFound: number;
+  registeredCount: number;
+  skippedCount: number;
+  invalidCount: number;
+  summaryNotes?: string;
+  uploadedByAdminId?: string;
+  createdAt: string;
+  uploadedByAdmin?: {
+    id: string;
+    username: string;
+  };
+  customers?: Array<{
+    id: string;
+    firstName: string;
+    secondName?: string;
+    vehicleNumber: string;
+  }>;
+}
+

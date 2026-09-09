@@ -122,15 +122,26 @@ export default function CustomerListPage() {
             Manage your {totalItems} registered customers and their vehicles
           </p>
         </div>
-        <Link
-          to="/customers/new"
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold transition-all shadow-lg shadow-indigo-500/30 hover:-translate-y-0.5"
-        >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-          </svg>
-          Add Customer
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            to="/customers/new?mode=pdf"
+            className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-sm font-semibold transition-all shadow-sm hover:-translate-y-0.5"
+          >
+            <svg className="w-4 h-4 text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+            </svg>
+            Uploaded PDF
+          </Link>
+          <Link
+            to="/customers/new"
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold transition-all shadow-lg shadow-indigo-500/30 hover:-translate-y-0.5"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            Add Customer
+          </Link>
+        </div>
       </div>
 
       {/* Search Bar */}
@@ -224,30 +235,68 @@ export default function CustomerListPage() {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-slate-900 dark:text-slate-300">{customer.phoneNumber}</div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <div className="inline-flex items-center px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-xs font-bold font-mono text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                          {customer.vehicleNumber}
+                    <td className="px-6 py-4">
+                      {customer.vehicles && customer.vehicles.length > 0 ? (
+                        <div className="flex flex-col gap-2">
+                          {customer.vehicles.map((v) => (
+                            <div key={v.id} className="flex items-center gap-1.5 flex-wrap">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-xs font-bold font-mono text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700">
+                                {v.vehicleNumber}
+                              </span>
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                                {v.vehicleType}
+                              </span>
+                              <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                v.status === 'Active'
+                                  ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
+                                  : v.status === 'Expired'
+                                  ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-200 dark:border-rose-800'
+                                  : 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800'
+                              }`}>
+                                {v.status}
+                              </span>
+                            </div>
+                          ))}
                         </div>
-                        {customer.vehicleType && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/40">
-                            {customer.vehicleType}
-                          </span>
-                        )}
-                      </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <div className="inline-flex items-center px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-xs font-bold font-mono text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                            {customer.vehicleNumber || 'No vehicle'}
+                          </div>
+                          {customer.vehicleType && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/40">
+                              {customer.vehicleType}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </td>
                     <td className="px-6 py-4">
-                      <div className="flex flex-wrap gap-2 items-center">
-                        {customer.currentDocuments && Object.values(customer.currentDocuments).map((doc: DocumentWithStatus) => (
-                          <div
-                            key={doc.id}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100/90 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 shadow-xs"
-                          >
-                            <span className="font-semibold text-slate-800 dark:text-slate-200">{doc.documentName}:</span>
-                            <StatusBadge status={doc.status} daysRemaining={doc.daysRemaining} compact />
-                          </div>
-                        ))}
-                        {(!customer.currentDocuments || Object.keys(customer.currentDocuments).length === 0) && (
+                      <div className="flex flex-wrap gap-1.5 items-center">
+                        {customer.vehicles && customer.vehicles.length > 0 ? (
+                          customer.vehicles.flatMap((v) =>
+                            v.documents ? v.documents.filter((d) => d.isCurrent).map((doc) => ({ ...doc, vehicleNumber: v.vehicleNumber })) : []
+                          ).slice(0, 6).map((doc) => (
+                            <div
+                              key={doc.id}
+                              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-xs font-medium bg-slate-100/90 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 shadow-xs"
+                              title={`${doc.documentName} for ${doc.vehicleNumber}`}
+                            >
+                              <span className="font-semibold text-slate-700 dark:text-slate-300">{doc.documentName}:</span>
+                              <StatusBadge status={doc.status} daysRemaining={doc.daysRemaining} compact />
+                            </div>
+                          ))
+                        ) : customer.currentDocuments && Object.values(customer.currentDocuments).length > 0 ? (
+                          Object.values(customer.currentDocuments).map((doc: DocumentWithStatus) => (
+                            <div
+                              key={doc.id}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100/90 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 shadow-xs"
+                            >
+                              <span className="font-semibold text-slate-800 dark:text-slate-200">{doc.documentName}:</span>
+                              <StatusBadge status={doc.status} daysRemaining={doc.daysRemaining} compact />
+                            </div>
+                          ))
+                        ) : (
                           <span className="text-xs text-slate-400 italic">No active documents</span>
                         )}
                       </div>

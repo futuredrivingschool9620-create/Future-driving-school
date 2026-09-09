@@ -17,6 +17,12 @@ import type {
   Notification,
   RenewalHistory,
   RegistrationHistoryResponse,
+  BatchPreviewResponse,
+  ConfirmBatchPayload,
+  BatchConfirmResponse,
+  UploadedPdfRecord,
+  Vehicle,
+  VehicleItemInput,
 } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
@@ -151,6 +157,65 @@ export const customerApi = {
     });
     return data;
   },
+
+  previewPdfBatch: async (fileName: string, fileBase64: string): Promise<BatchPreviewResponse> => {
+    const { data } = await api.post<BatchPreviewResponse>('/customers/upload-pdf/preview', {
+      fileName,
+      fileBase64,
+    });
+    return data;
+  },
+
+  confirmPdfBatch: async (payload: ConfirmBatchPayload): Promise<BatchConfirmResponse> => {
+    const { data } = await api.post<BatchConfirmResponse>('/customers/upload-pdf/confirm', payload);
+    return data;
+  },
+
+  downloadSamplePdf: async (): Promise<Blob> => {
+    const response = await api.get('/customers/upload-pdf/sample', {
+      responseType: 'blob',
+    });
+    return response.data;
+  },
+};
+
+// ── Vehicle API ──
+
+export const vehicleApi = {
+  create: async (customerId: string, input: VehicleItemInput): Promise<Vehicle> => {
+    const { data } = await api.post<Vehicle>(`/customers/${customerId}/vehicles`, input);
+    return data;
+  },
+
+  getById: async (id: string): Promise<Vehicle> => {
+    const { data } = await api.get<Vehicle>(`/vehicles/${id}`);
+    return data;
+  },
+
+  getByCustomerId: async (customerId: string): Promise<Vehicle[]> => {
+    const { data } = await api.get<Vehicle[]>(`/customers/${customerId}/vehicles`);
+    return data;
+  },
+
+  update: async (id: string, input: Partial<VehicleItemInput> & { isActive?: boolean }): Promise<Vehicle> => {
+    const { data } = await api.put<Vehicle>(`/vehicles/${id}`, input);
+    return data;
+  },
+
+  updateStatus: async (id: string, input: { status?: string; isActive?: boolean }): Promise<Vehicle> => {
+    const { data } = await api.patch<Vehicle>(`/vehicles/${id}/status`, input);
+    return data;
+  },
+
+  delete: async (id: string): Promise<{ message: string }> => {
+    const { data } = await api.delete<{ message: string }>(`/vehicles/${id}`);
+    return data;
+  },
+
+  addDocument: async (vehicleId: string, input: CreateDocumentInput): Promise<DocumentWithStatus> => {
+    const { data } = await api.post<DocumentWithStatus>(`/vehicles/${vehicleId}/documents`, input);
+    return data;
+  },
 };
 
 // ── Document API ──
@@ -192,6 +257,17 @@ export const documentApi = {
       params: filters,
     });
     return data;
+  },
+
+  getUploadedPdfs: async (page = 1, limit = 20): Promise<PaginatedResponse<UploadedPdfRecord>> => {
+    const { data } = await api.get<PaginatedResponse<UploadedPdfRecord>>('/documents/uploaded-pdfs', {
+      params: { page, limit },
+    });
+    return data;
+  },
+
+  getUploadedPdfDownloadUrl: (id: string): string => {
+    return `${API_BASE}/documents/uploaded-pdfs/${id}/download`;
   },
 };
 

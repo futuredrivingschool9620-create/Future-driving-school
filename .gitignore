@@ -12,4 +12,5 @@ dist-electron/
 *.log
 **/*.log
 test-*.cjs
-server/test-db.cjs
+uploads/
+**/uploads/

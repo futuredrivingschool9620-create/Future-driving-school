@@ -36,7 +36,7 @@ export default function CustomerEditPage() {
         setVehicleType(data.vehicleType);
       }
       setPhoneNumber(data.phoneNumber);
-      setVehicleNumber(data.vehicleNumber);
+      setVehicleNumber(data.vehicleNumber || data.vehicles?.[0]?.vehicleNumber || '');
       setRemarks(data.remarks || '');
     } catch (err) {
       console.error(err);

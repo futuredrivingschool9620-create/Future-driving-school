@@ -81,6 +81,9 @@ model AdminUser {
   updatedCustomers  Customer[]       @relation("CustomerUpdatedBy")
   renewalHistories  RenewalHistory[]
   refreshTokens     RefreshToken[]
+  uploadedPdfs      UploadedPdf[]    @relation("UploadedPdfAdmin")
+  createdVehicles   Vehicle[]        @relation("VehicleCreatedBy")
+  updatedVehicles   Vehicle[]        @relation("VehicleUpdatedBy")
 
   @@map("admin_users")
 }
@@ -105,16 +108,20 @@ model Customer {
   secondName    String?  @map("second_name")
   vehicleType   String?  @map("vehicle_type")
   phoneNumber   String   @map("phone_number")
-  vehicleNumber String   @map("vehicle_number")
+  vehicleNumber String?  @map("vehicle_number")
+  drivingLicenceNumber String? @map("driving_licence_number")
   remarks       String?  @db.VarChar(500)
   isActive      Boolean  @default(true) @map("is_active")
   createdByAdminId String?   @map("created_by_admin_id")
   updatedByAdminId String?   @map("updated_by_admin_id")
+  uploadedPdfId String?   @map("uploaded_pdf_id")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
   createdByAdmin AdminUser? @relation("CustomerCreatedBy", fields: [createdByAdminId], references: [id])
   updatedByAdmin AdminUser? @relation("CustomerUpdatedBy", fields: [updatedByAdminId], references: [id])
+  uploadedPdf    UploadedPdf? @relation(fields: [uploadedPdfId], references: [id], onDelete: SetNull)
+  vehicles       Vehicle[]
   documents      Document[]
   notifications  Notification[]
   renewalHistories RenewalHistory[]
@@ -123,13 +130,43 @@ model Customer {
   @@index([secondName])
   @@index([phoneNumber])
   @@index([vehicleNumber])
+  @@index([drivingLicenceNumber])
+  @@index([uploadedPdfId])
   @@index([isActive])
   @@map("customers")
+}
+
+model Vehicle {
+  id               String    @id @default(uuid())
+  customerId       String    @map("customer_id")
+  vehicleType      String    @map("vehicle_type") // "2 Wheeler" | "4 Wheeler" | "Truck"
+  vehicleNumber    String    @map("vehicle_number")
+  status           String    @default("Active") @map("status") // "Active" | "Expired" | "Renewed"
+  isActive         Boolean   @default(true) @map("is_active")
+  notes            String?   @db.VarChar(500)
+  createdByAdminId String?   @map("created_by_admin_id")
+  updatedByAdminId String?   @map("updated_by_admin_id")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  customer         Customer         @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  createdByAdmin   AdminUser?       @relation("VehicleCreatedBy", fields: [createdByAdminId], references: [id])
+  updatedByAdmin   AdminUser?       @relation("VehicleUpdatedBy", fields: [updatedByAdminId], references: [id])
+  documents        Document[]
+  notifications    Notification[]
+  renewalHistories RenewalHistory[]
+
+  @@index([customerId])
+  @@index([vehicleNumber])
+  @@index([isActive])
+  @@index([status])
+  @@map("vehicles")
 }
 
 model Document {
   id              String   @id @default(uuid())
   customerId      String   @map("customer_id")
+  vehicleId       String?  @map("vehicle_id")
   documentName    String   @map("document_name")  // "Insurance", "FC", "Tax", "Permit", etc.
   startDate       DateTime @map("start_date")
   endDate         DateTime @map("end_date")
@@ -143,12 +180,14 @@ model Document {
   updatedAt       DateTime @updatedAt @map("updated_at")
 
   customer       Customer   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  vehicle        Vehicle?   @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   createdByAdmin AdminUser  @relation("DocumentCreatedBy", fields: [createdByAdminId], references: [id])
   updatedByAdmin AdminUser? @relation("DocumentUpdatedBy", fields: [updatedByAdminId], references: [id])
   notifications  Notification[]
   renewalHistories RenewalHistory[]
 
   @@index([customerId])
+  @@index([vehicleId])
   @@index([documentName])
   @@index([endDate])
   @@index([isActive, isCurrent])
@@ -159,6 +198,7 @@ model Document {
 model Notification {
   id                String             @id @default(uuid())
   customerId        String             @map("customer_id")
+  vehicleId         String?            @map("vehicle_id")
   documentId        String             @map("document_id")
   customerName      String             @map("customer_name")
   phoneNumber       String             @map("phone_number")
@@ -180,11 +220,13 @@ model Notification {
   createdAt         DateTime           @default(now()) @map("created_at")
 
   customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  vehicle  Vehicle? @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
   // Unique constraint to prevent duplicate notifications
   @@unique([customerId, documentId, reminderType, currentExpiryDate, calendarDay], name: "unique_notification_per_day")
   @@index([customerId])
+  @@index([vehicleId])
   @@index([documentId])
   @@index([notificationStatus])
   @@index([sentDate])
@@ -196,6 +238,7 @@ model Notification {
 model RenewalHistory {
   id              String   @id @default(uuid())
   customerId      String   @map("customer_id")
+  vehicleId       String?  @map("vehicle_id")
   documentId      String   @map("document_id")
   oldDocumentName String   @map("old_document_name")
   oldStartDate    DateTime @map("old_start_date")
@@ -207,11 +250,13 @@ model RenewalHistory {
   notes           String?
   createdAt       DateTime @default(now()) @map("created_at")
 
-  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  customer Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  vehicle  Vehicle?  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  document Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
   admin    AdminUser @relation(fields: [adminId], references: [id])
 
   @@index([customerId])
+  @@index([vehicleId])
   @@index([documentId])
   @@index([renewalDate])
   @@map("renewal_history")
@@ -234,4 +279,27 @@ model AuditLog {
   @@index([adminId])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+model UploadedPdf {
+  id                String      @id @default(uuid())
+  fileName          String      @map("file_name")
+  fileSize          Int         @map("file_size")
+  mimeType          String      @default("application/pdf") @map("mime_type")
+  storagePath       String      @map("storage_path")
+  fileData          String?     @map("file_data")
+  totalFound        Int         @default(0) @map("total_found")
+  registeredCount   Int         @default(0) @map("registered_count")
+  skippedCount      Int         @default(0) @map("skipped_count")
+  invalidCount      Int         @default(0) @map("invalid_count")
+  summaryNotes      String?     @map("summary_notes")
+  uploadedByAdminId String?     @map("uploaded_by_admin_id")
+  createdAt         DateTime    @default(now()) @map("created_at")
+
+  uploadedByAdmin   AdminUser?  @relation("UploadedPdfAdmin", fields: [uploadedByAdminId], references: [id])
+  customers         Customer[]
+
+  @@index([uploadedByAdminId])
+  @@index([createdAt])
+  @@map("uploaded_pdfs")
 }

@@ -45,17 +45,38 @@ export function validateAndFormatVehicleNumber(input: string): { valid: boolean;
   return { valid: false, error: 'Invalid Indian vehicle registration number format (e.g. KA 01 AB 1234 or TN 38 BC 5678)' };
 }
 
+export const vehicleItemInputSchema = z.object({
+  vehicleType: z.enum(['2 Wheeler', '4 Wheeler', 'Truck']),
+  vehicleNumber: z.string().min(1, 'Vehicle number is required').max(25).refine(
+    (val) => validateAndFormatVehicleNumber(val).valid,
+    (val) => ({ message: validateAndFormatVehicleNumber(val).error || 'Invalid Indian vehicle number' })
+  ).transform((val) => validateAndFormatVehicleNumber(val).formatted || val.toUpperCase()),
+  status: z.enum(['Active', 'Expired', 'Renewed']).default('Active').optional(),
+  notes: z.string().max(500).optional(),
+  insurance: z.object({
+    startDate: z.string().refine((val) => !isNaN(Date.parse(val)), { message: 'Invalid start date' }),
+    endDate: z.string().refine((val) => !isNaN(Date.parse(val)), { message: 'Invalid end date' }),
+  }).optional().or(z.null()),
+  fc: z.object({
+    startDate: z.string().refine((val) => !isNaN(Date.parse(val)), { message: 'Invalid start date' }),
+    endDate: z.string().refine((val) => !isNaN(Date.parse(val)), { message: 'Invalid end date' }),
+  }).optional().or(z.null()),
+  tax: z.object({
+    startDate: z.string().refine((val) => !isNaN(Date.parse(val)), { message: 'Invalid start date' }),
+    endDate: z.string().refine((val) => !isNaN(Date.parse(val)), { message: 'Invalid end date' }),
+  }).optional().or(z.null()),
+  documents: z.array(documentInputSchema).optional(),
+});
+
 export const createCustomerSchema = z.object({
   firstName: z.string().min(1, 'First name is required').max(100),
   secondName: z.string().max(100).optional().or(z.literal('')),
   vehicleType: z.enum(['2 Wheeler', '4 Wheeler', 'Truck']).optional().or(z.literal('')).or(z.null()),
   phoneNumber: z.string().min(5, 'Phone number is required').max(20),
-  vehicleNumber: z.string().min(1, 'Vehicle number is required').max(25).refine(
-    (val) => validateAndFormatVehicleNumber(val).valid,
-    (val) => ({ message: validateAndFormatVehicleNumber(val).error || 'Invalid Indian vehicle number' })
-  ).transform((val) => validateAndFormatVehicleNumber(val).formatted || val.toUpperCase()),
+  vehicleNumber: z.string().max(25).optional().or(z.literal('')).or(z.null()),
   remarks: z.string().max(500).optional(),
   documents: z.array(documentInputSchema).optional(),
+  vehicles: z.array(vehicleItemInputSchema).optional(),
 });
 
 export const updateCustomerSchema = z.object({
@@ -72,4 +93,6 @@ export const updateCustomerSchema = z.object({
 
 export type CreateCustomerInput = z.infer<typeof createCustomerSchema>;
 export type UpdateCustomerInput = z.infer<typeof updateCustomerSchema>;
+export type VehicleItemInput = z.infer<typeof vehicleItemInputSchema>;
+
 

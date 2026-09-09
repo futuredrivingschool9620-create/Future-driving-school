@@ -14,6 +14,7 @@ import notificationRoutes from './routes/notification.routes.js';
 import renewalRoutes from './routes/renewal.routes.js';
 import dashboardRoutes from './routes/dashboard.routes.js';
 import sseRoutes from './routes/sse.routes.js';
+import vehicleRoutes from './routes/vehicle.routes.js';
 
 const app = express();
 
@@ -63,6 +64,7 @@ app.use('/api/documents', documentRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/renewals', renewalRoutes);
+app.use('/api/vehicles', vehicleRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/events', sseRoutes);
 

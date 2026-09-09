@@ -382,9 +382,10 @@ export default function HomePage() {
             ) : (
               <div>
                 {expiringDocs.map((doc, index) => (
-                  <div
+                  <Link
                     key={doc.id}
-                    className="hp-fade-up group relative p-4 flex items-center justify-between gap-4 hover:bg-indigo-500/[0.04] transition-colors"
+                    to={`/customers/${doc.customer.id}`}
+                    className="hp-fade-up group relative p-4 flex items-center justify-between gap-4 hover:bg-indigo-500/[0.04] transition-colors cursor-pointer"
                     style={{ animationDelay: `${index * 45}ms`, borderBottom: index < expiringDocs.length - 1 ? '1px solid var(--color-border)' : 'none' }}
                   >
                     <div className="absolute left-0 top-3 bottom-3 w-0.5 rounded-full bg-gradient-to-b from-indigo-500 to-purple-500 scale-y-0 group-hover:scale-y-100 transition-transform origin-center" />
@@ -395,13 +396,12 @@ export default function HomePage() {
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <Link
-                            to={`/customers/${doc.customer.id}`}
-                            className="font-bold text-sm hover:text-indigo-500 transition-colors truncate"
+                          <span
+                            className="font-bold text-sm group-hover:text-indigo-500 transition-colors truncate"
                             style={{ color: 'var(--color-text-primary)' }}
                           >
                             {doc.customer.firstName} {doc.customer.secondName}
-                          </Link>
+                          </span>
                           <span
                             className="font-mono text-[11px] font-bold tracking-wider px-2 py-0.5 rounded-md"
                             style={{ backgroundColor: 'var(--color-bg-tertiary)', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' }}
@@ -419,17 +419,16 @@ export default function HomePage() {
 
                     <div className="flex items-center gap-3 flex-shrink-0">
                       <StatusBadge status={doc.status} daysRemaining={doc.daysRemaining} compact />
-                      <Link
-                        to={`/customers/${doc.customer.id}`}
-                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-indigo-600 to-purple-600 opacity-90 hover:opacity-100 hover:shadow-lg hover:shadow-indigo-500/30 active:scale-95 transition-all"
+                      <span
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-indigo-600 to-purple-600 opacity-90 group-hover:opacity-100 group-hover:shadow-lg group-hover:shadow-indigo-500/30 active:scale-95 transition-all"
                       >
                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
                         </svg>
                         Renew
-                      </Link>
+                      </span>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             )}

@@ -7,6 +7,7 @@ export class NotificationService {
    */
   static async getHistory(params: {
     customerId?: string;
+    vehicleId?: string;
     documentId?: string;
     status?: NotificationStatus;
     page?: number;
@@ -21,6 +22,7 @@ export class NotificationService {
       document: { isActive: true }
     };
     if (params.customerId) where.customerId = params.customerId;
+    if (params.vehicleId) where.vehicleId = params.vehicleId;
     if (params.documentId) where.documentId = params.documentId;
     if (params.status) where.notificationStatus = params.status;
 
@@ -100,6 +102,7 @@ export class NotificationService {
    */
   static async createNotification(data: {
     customerId: string;
+    vehicleId?: string;
     documentId: string;
     customerName: string;
     phoneNumber: string;
@@ -115,6 +118,7 @@ export class NotificationService {
       return await prisma.notification.create({
         data: {
           customerId: data.customerId,
+          vehicleId: data.vehicleId || null,
           documentId: data.documentId,
           customerName: data.customerName,
           phoneNumber: data.phoneNumber,
