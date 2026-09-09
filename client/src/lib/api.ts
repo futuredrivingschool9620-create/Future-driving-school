@@ -158,6 +158,25 @@ export const customerApi = {
     return data;
   },
 
+  checkPhone: async (
+    phone: string,
+    excludeId?: string
+  ): Promise<{
+    exists: boolean;
+    message: string;
+    customer?: {
+      id: string;
+      name: string;
+      phoneNumber: string;
+      vehicles: Array<{ vehicleNumber: string; vehicleType: string }>;
+    };
+  }> => {
+    const { data } = await api.get(`/customers/check-phone/${encodeURIComponent(phone)}`, {
+      params: excludeId ? { excludeId } : undefined,
+    });
+    return data;
+  },
+
   previewPdfBatch: async (fileName: string, fileBase64: string): Promise<BatchPreviewResponse> => {
     const { data } = await api.post<BatchPreviewResponse>('/customers/upload-pdf/preview', {
       fileName,

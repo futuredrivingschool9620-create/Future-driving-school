@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { CustomerService } from '../services/customer.service.js';
+import { prisma } from '../lib/prisma.js';
 import { getIp, getParam, getQuery } from '../utils/express.js';
 
 export class CustomerController {
@@ -18,6 +19,48 @@ export class CustomerController {
     try {
       const customer = await CustomerService.getById(getParam(req, 'id'));
       res.json(customer);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async checkPhone(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const phone = getParam(req, 'phone');
+      const excludeId = getQuery(req, 'excludeId');
+      const clean = phone.replace(/\D/g, '');
+      const existing = await prisma.customer.findFirst({
+        where: {
+          phoneNumber: clean,
+          isActive: true,
+          ...(excludeId ? { id: { not: excludeId } } : {}),
+        },
+        include: {
+          vehicles: {
+            where: { isActive: true },
+            select: { vehicleNumber: true, vehicleType: true },
+          },
+        },
+      });
+
+      if (existing) {
+        const name = [existing.firstName, existing.secondName].filter(Boolean).join(' ');
+        res.json({
+          exists: true,
+          message: `Mobile number ${clean} is already registered to "${name}". Duplicate numbers are not allowed.`,
+          customer: {
+            id: existing.id,
+            name,
+            phoneNumber: existing.phoneNumber,
+            vehicles: existing.vehicles,
+          },
+        });
+      } else {
+        res.json({
+          exists: false,
+          message: 'Mobile number is available.',
+        });
+      }
     } catch (error) {
       next(error);
     }

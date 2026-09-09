@@ -1,5 +1,5 @@
 import { prisma } from '../lib/prisma.js';
-import { NotFoundError } from '../utils/errors.js';
+import { NotFoundError, BadRequestError } from '../utils/errors.js';
 import { AuditService } from './audit.service.js';
 import { DocumentStatusService } from './documentStatus.service.js';
 import { VehicleService } from './vehicle.service.js';
@@ -120,8 +120,8 @@ export class CustomerService {
   }
 
   /**
-   * Create a new customer or attach new vehicle(s) to an existing customer with the same phone number.
-   * Guarantees zero duplicate customer profiles.
+   * Create a new customer and attach vehicles.
+   * Strictly disallows duplicate mobile numbers.
    */
   static async create(
     data: CreateCustomerInput,
@@ -131,44 +131,32 @@ export class CustomerService {
     const normalizedPhone = data.phoneNumber.trim();
 
     // Check if customer already exists by phone number
-    let customer = await prisma.customer.findFirst({
+    const existing = await prisma.customer.findFirst({
       where: { phoneNumber: normalizedPhone, isActive: true },
     });
 
-    const isExisting = !!customer;
-
-    if (!customer) {
-      // Create new customer
-      const primaryVehicleNumber = data.vehicles?.[0]?.vehicleNumber || (data.vehicleNumber ? data.vehicleNumber.trim().toUpperCase() : null);
-      const primaryVehicleType = data.vehicles?.[0]?.vehicleType || data.vehicleType || null;
-
-      customer = await prisma.customer.create({
-        data: {
-          firstName: data.firstName.trim(),
-          secondName: data.secondName?.trim() || null,
-          vehicleType: primaryVehicleType,
-          phoneNumber: normalizedPhone,
-          vehicleNumber: primaryVehicleNumber,
-          remarks: data.remarks?.trim() || null,
-          createdByAdminId: adminId,
-          updatedByAdminId: adminId,
-        },
-      });
-    } else {
-      // Append remarks or update if specified
-      if (data.remarks?.trim()) {
-        const combinedRemarks = customer.remarks
-          ? `${customer.remarks}\n${data.remarks.trim()}`
-          : data.remarks.trim();
-        customer = await prisma.customer.update({
-          where: { id: customer.id },
-          data: {
-            remarks: combinedRemarks,
-            updatedByAdminId: adminId,
-          },
-        });
-      }
+    if (existing) {
+      const existingName = [existing.firstName, existing.secondName].filter(Boolean).join(' ');
+      throw new BadRequestError(
+        `Mobile number ${normalizedPhone} is already registered to customer "${existingName}". Duplicate mobile numbers are not allowed.`
+      );
     }
+
+    const primaryVehicleNumber = data.vehicles?.[0]?.vehicleNumber || (data.vehicleNumber ? data.vehicleNumber.trim().toUpperCase() : null);
+    const primaryVehicleType = data.vehicles?.[0]?.vehicleType || data.vehicleType || null;
+
+    const customer = await prisma.customer.create({
+      data: {
+        firstName: data.firstName.trim(),
+        secondName: data.secondName?.trim() || null,
+        vehicleType: primaryVehicleType,
+        phoneNumber: normalizedPhone,
+        vehicleNumber: primaryVehicleNumber,
+        remarks: data.remarks?.trim() || null,
+        createdByAdminId: adminId,
+        updatedByAdminId: adminId,
+      },
+    });
 
     // Now create vehicles for this customer
     if (data.vehicles && data.vehicles.length > 0) {
@@ -193,12 +181,11 @@ export class CustomerService {
       adminId,
       entityType: 'Customer',
       entityId: customer.id,
-      action: isExisting ? 'UPDATE' : 'CREATE',
+      action: 'CREATE',
       newData: {
         firstName: customer.firstName,
         secondName: customer.secondName,
         phoneNumber: customer.phoneNumber,
-        isExistingCustomer: isExisting,
       },
       ipAddress,
     });
@@ -215,6 +202,25 @@ export class CustomerService {
     const existing = await prisma.customer.findUnique({ where: { id } });
     if (!existing) {
       throw new NotFoundError('Customer not found');
+    }
+
+    if (data.phoneNumber !== undefined) {
+      const normalizedPhone = data.phoneNumber.trim();
+      if (normalizedPhone !== existing.phoneNumber) {
+        const conflict = await prisma.customer.findFirst({
+          where: {
+            phoneNumber: normalizedPhone,
+            isActive: true,
+            id: { not: id },
+          },
+        });
+        if (conflict) {
+          const conflictName = [conflict.firstName, conflict.secondName].filter(Boolean).join(' ');
+          throw new BadRequestError(
+            `Mobile number ${normalizedPhone} is already registered to customer "${conflictName}". Duplicate mobile numbers are not allowed.`
+          );
+        }
+      }
     }
 
     const updated = await prisma.customer.update({

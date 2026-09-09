@@ -17,6 +17,12 @@ export default function CustomerEditPage() {
   const [vehicleType, setVehicleType] = useState<'2 Wheeler' | '4 Wheeler' | 'Truck'>('4 Wheeler');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [phoneError, setPhoneError] = useState('');
+  const [duplicateCustomer, setDuplicateCustomer] = useState<{
+    id: string;
+    name: string;
+    phoneNumber: string;
+  } | null>(null);
+  const [isCheckingPhone, setIsCheckingPhone] = useState(false);
   const [vehicleNumber, setVehicleNumber] = useState('');
   const [vehicleError, setVehicleError] = useState('');
   const [remarks, setRemarks] = useState('');
@@ -52,6 +58,49 @@ export default function CustomerEditPage() {
     fetchCustomer();
   }, [fetchCustomer]);
 
+  // Real-time phone duplicate check (excluding currently edited customer)
+  useEffect(() => {
+    const cleanPhone = phoneNumber.replace(/\D/g, '');
+    if (cleanPhone.length === 10) {
+      const vResult = validatePhoneNumber(cleanPhone);
+      if (!vResult.valid) {
+        setPhoneError(vResult.error || 'Invalid mobile number');
+        setDuplicateCustomer(null);
+        setIsCheckingPhone(false);
+        return;
+      }
+
+      let isCurrent = true;
+      setIsCheckingPhone(true);
+      customerApi
+        .checkPhone(cleanPhone, id)
+        .then((res) => {
+          if (!isCurrent) return;
+          if (res.exists && res.customer) {
+            setDuplicateCustomer(res.customer);
+            setPhoneError(`Mobile number is already registered to ${res.customer.name}. Duplicate numbers are not allowed.`);
+          } else {
+            setDuplicateCustomer(null);
+            setPhoneError('');
+          }
+        })
+        .catch((err) => {
+          console.error('Error checking phone duplicate:', err);
+          if (isCurrent) setDuplicateCustomer(null);
+        })
+        .finally(() => {
+          if (isCurrent) setIsCheckingPhone(false);
+        });
+
+      return () => {
+        isCurrent = false;
+      };
+    } else {
+      setDuplicateCustomer(null);
+      setIsCheckingPhone(false);
+    }
+  }, [phoneNumber, id]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!id) return;
@@ -67,6 +116,14 @@ export default function CustomerEditPage() {
       return;
     }
     setPhoneError('');
+
+    if (duplicateCustomer) {
+      const msg = `Mobile number ${duplicateCustomer.phoneNumber} is already registered to ${duplicateCustomer.name}. Duplicate numbers are not allowed.`;
+      setPhoneError(msg);
+      setError(msg);
+      setIsSubmitting(false);
+      return;
+    }
 
     const vResult = validateAndFormatVehicleNumber(vehicleNumber);
     if (!vResult.valid) {
@@ -161,32 +218,46 @@ export default function CustomerEditPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Phone Number *</label>
-              <input
-                type="tel"
-                required
-                maxLength={10}
-                value={phoneNumber}
-                onChange={e => {
-                  const sanitized = sanitizePhoneInput(e.target.value);
-                  setPhoneNumber(sanitized);
-                  if (phoneError) setPhoneError('');
-                }}
-                onBlur={() => {
-                  if (phoneNumber.trim()) {
-                    const res = validatePhoneNumber(phoneNumber);
-                    if (!res.valid) {
-                      setPhoneError(res.error || 'Invalid mobile number');
-                    } else {
-                      setPhoneError('');
+              <div className="relative">
+                <input
+                  type="tel"
+                  required
+                  maxLength={10}
+                  value={phoneNumber}
+                  onChange={e => {
+                    const sanitized = sanitizePhoneInput(e.target.value);
+                    setPhoneNumber(sanitized);
+                    if (phoneError) setPhoneError('');
+                    if (duplicateCustomer) setDuplicateCustomer(null);
+                  }}
+                  onBlur={() => {
+                    if (phoneNumber.trim()) {
+                      const res = validatePhoneNumber(phoneNumber);
+                      if (!res.valid) {
+                        setPhoneError(res.error || 'Invalid mobile number');
+                      } else if (duplicateCustomer) {
+                        setPhoneError(`Mobile number is already registered to ${duplicateCustomer.name}. Duplicate numbers are not allowed.`);
+                      } else {
+                        setPhoneError('');
+                      }
                     }
-                  }
-                }}
-                className={`w-full px-4 py-3 rounded-xl border ${
-                  phoneError ? 'border-rose-500 ring-1 ring-rose-500' : 'border-slate-200 dark:border-slate-700'
-                } bg-white dark:bg-slate-900 focus:ring-2 focus:ring-teal-500 font-mono`}
-              />
+                  }}
+                  className={`w-full px-4 py-3 rounded-xl border ${
+                    phoneError || duplicateCustomer ? 'border-rose-500 ring-1 ring-rose-500' : 'border-slate-200 dark:border-slate-700'
+                  } bg-white dark:bg-slate-900 focus:ring-2 focus:ring-teal-500 font-mono`}
+                />
+                {isCheckingPhone ? (
+                  <div className="absolute right-3 top-3.5 w-4 h-4 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
+                ) : duplicateCustomer ? (
+                  <div className="absolute right-3 top-3.5 text-rose-500 font-bold text-sm" title="Duplicate Number">
+                    ✕
+                  </div>
+                ) : null}
+              </div>
               {phoneError ? (
-                <p className="mt-1.5 text-xs text-rose-500 font-medium">{phoneError}</p>
+                <p className="mt-1.5 text-xs text-rose-500 font-medium flex items-center gap-1">
+                  <span>⚠️</span> {phoneError}
+                </p>
               ) : phoneNumber.length === 10 && /^[6-9]/.test(phoneNumber) ? (
                 <p className="mt-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
                   Valid 10-digit Indian mobile number
@@ -370,10 +441,10 @@ export default function CustomerEditPage() {
           </Link>
           <button
             type="submit"
-            disabled={isSubmitting}
-            className="px-8 py-3 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-sm font-bold shadow-lg shadow-teal-500/30 transition-all disabled:opacity-70"
+            disabled={isSubmitting || !!duplicateCustomer || isCheckingPhone}
+            className="px-8 py-3 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-sm font-bold shadow-lg shadow-teal-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isSubmitting ? 'Saving...' : 'Save Changes'}
+            {isSubmitting ? 'Saving...' : duplicateCustomer ? 'Duplicate Number – Cannot Save' : 'Save Changes'}
           </button>
         </div>
       </form>

@@ -4,7 +4,6 @@ import { customerApi } from '../../lib/api';
 import { validateAndFormatVehicleNumber } from '../../lib/vehicleValidation';
 import { validatePhoneNumber, sanitizePhoneInput } from '../../lib/phoneValidation';
 import UploadedPdfSection from './UploadedPdfSection';
-import type { Customer } from '../../types';
 
 interface OtherDocItem {
   id: string;
@@ -62,36 +61,65 @@ export default function CustomerRegistrationPage() {
   const [phoneError, setPhoneError] = useState('');
   const [remarks, setRemarks] = useState('');
 
-  // Existing customer check
-  const [existingCustomer, setExistingCustomer] = useState<Customer | null>(null);
+  // Duplicate customer check
+  const [duplicateCustomer, setDuplicateCustomer] = useState<{
+    id: string;
+    name: string;
+    phoneNumber: string;
+    vehicles: Array<{ vehicleNumber: string; vehicleType: string }>;
+  } | null>(null);
   const [isCheckingPhone, setIsCheckingPhone] = useState(false);
+  const [isPhoneAvailable, setIsPhoneAvailable] = useState(false);
 
   // Dynamic Vehicles List
   const [vehicles, setVehicles] = useState<VehicleFormItem[]>([createDefaultVehicle()]);
 
-  // Phone number duplicate / existence check
+  // Phone number duplicate check in database
   useEffect(() => {
     const cleanPhone = phoneNumber.replace(/\D/g, '');
+
+    // If not 10 digits yet, clear states
+    if (cleanPhone.length < 10) {
+      setDuplicateCustomer(null);
+      setIsPhoneAvailable(false);
+      setIsCheckingPhone(false);
+      return;
+    }
+
     if (cleanPhone.length === 10) {
+      const vResult = validatePhoneNumber(cleanPhone);
+      if (!vResult.valid) {
+        setPhoneError(vResult.error || 'Invalid mobile number');
+        setDuplicateCustomer(null);
+        setIsPhoneAvailable(false);
+        setIsCheckingPhone(false);
+        return;
+      }
+
       let isCurrent = true;
       setIsCheckingPhone(true);
       customerApi
-        .search(cleanPhone)
+        .checkPhone(cleanPhone)
         .then((res) => {
           if (!isCurrent) return;
-          const match = res.data.find(
-            (c) => c.phoneNumber.replace(/\D/g, '') === cleanPhone
-          );
-          if (match) {
-            setExistingCustomer(match);
-            if (!firstName.trim()) setFirstName(match.firstName);
-            if (!secondName.trim() && match.secondName) setSecondName(match.secondName);
+          if (res.exists && res.customer) {
+            setDuplicateCustomer(res.customer);
+            setIsPhoneAvailable(false);
+            setPhoneError(
+              `This number is already registered to ${res.customer.name}. Duplicate numbers are not allowed.`
+            );
           } else {
-            setExistingCustomer(null);
+            setDuplicateCustomer(null);
+            setIsPhoneAvailable(true);
+            setPhoneError('');
           }
         })
-        .catch(() => {
-          if (isCurrent) setExistingCustomer(null);
+        .catch((err) => {
+          console.error('Error checking phone duplicate:', err);
+          if (isCurrent) {
+            setDuplicateCustomer(null);
+            setIsPhoneAvailable(false);
+          }
         })
         .finally(() => {
           if (isCurrent) setIsCheckingPhone(false);
@@ -100,8 +128,6 @@ export default function CustomerRegistrationPage() {
       return () => {
         isCurrent = false;
       };
-    } else {
-      setExistingCustomer(null);
     }
   }, [phoneNumber]);
 
@@ -189,6 +215,14 @@ export default function CustomerRegistrationPage() {
     }
     setPhoneError('');
 
+    // Check for duplicate customer
+    if (duplicateCustomer) {
+      const msg = `Mobile number ${duplicateCustomer.phoneNumber} is already registered to ${duplicateCustomer.name}. Duplicate registrations are not allowed.`;
+      setPhoneError(msg);
+      setError(msg);
+      return;
+    }
+
     // Validate all vehicle numbers
     let hasVehicleError = false;
     const formattedVehicles: any[] = [];
@@ -253,10 +287,22 @@ export default function CustomerRegistrationPage() {
 
     try {
       setIsSubmitting(true);
+
+      // Verify with server database check to guarantee no duplicates
+      const checkRes = await customerApi.checkPhone(phoneResult.clean!);
+      if (checkRes.exists && checkRes.customer) {
+        setDuplicateCustomer(checkRes.customer);
+        const msg = `Mobile number ${checkRes.customer.phoneNumber} is already registered to ${checkRes.customer.name}. Duplicate registrations are not allowed.`;
+        setPhoneError(msg);
+        setError(msg);
+        setIsSubmitting(false);
+        return;
+      }
+
       const res = await customerApi.create({
         firstName: firstName.trim(),
         secondName: secondName.trim() || undefined,
-        phoneNumber: phoneNumber.trim(),
+        phoneNumber: phoneResult.clean || phoneNumber.trim(),
         remarks: remarks.trim() || undefined,
         vehicles: formattedVehicles,
       });
@@ -264,7 +310,11 @@ export default function CustomerRegistrationPage() {
       navigate(`/customers/${res.id}`);
     } catch (err: any) {
       console.error(err);
-      setError(err.response?.data?.error || 'Failed to register customer');
+      const errMsg = err.response?.data?.error || 'Failed to register customer';
+      setError(errMsg);
+      if (errMsg.toLowerCase().includes('already exists') || errMsg.toLowerCase().includes('duplicate')) {
+        setPhoneError(errMsg);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -350,25 +400,46 @@ export default function CustomerRegistrationPage() {
                   <span className="flex items-center justify-center w-6 h-6 rounded-lg bg-indigo-100 text-indigo-700 dark:bg-indigo-900/60 dark:text-indigo-300 text-xs font-black">1</span>
                   Customer Profile
                 </h2>
-                {existingCustomer && (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    Existing Customer Found ({existingCustomer.vehicles?.length || 1} vehicles registered)
+                {duplicateCustomer ? (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-300 dark:border-rose-800 animate-pulse">
+                    <span className="w-2 h-2 rounded-full bg-rose-500" />
+                    Duplicate Mobile Number Blocked
                   </span>
-                )}
+                ) : isPhoneAvailable ? (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                    Mobile Number Available
+                  </span>
+                ) : null}
               </div>
 
-              {existingCustomer && (
-                <div className="mb-6 p-4 rounded-xl bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 text-xs text-indigo-900 dark:text-indigo-200 flex items-center justify-between">
-                  <div>
-                    <span className="font-bold">{existingCustomer.fullName || existingCustomer.firstName}</span> is already in your database. Adding vehicles below will link them directly to this existing customer profile with <strong>no duplicate records created</strong>.
+              {duplicateCustomer && (
+                <div className="mb-6 p-4 rounded-xl bg-rose-50/95 dark:bg-rose-950/60 border border-rose-300 dark:border-rose-800 text-rose-900 dark:text-rose-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 rounded-lg bg-rose-100 dark:bg-rose-900/60 text-rose-600 dark:text-rose-300 shrink-0 mt-0.5">
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="font-bold text-sm text-rose-800 dark:text-rose-200">
+                        Duplicate Mobile Number: {duplicateCustomer.phoneNumber}
+                      </p>
+                      <p className="text-xs text-rose-700 dark:text-rose-300 mt-1 leading-relaxed">
+                        This mobile number is already registered under <strong>{duplicateCustomer.name}</strong>
+                        {duplicateCustomer.vehicles && duplicateCustomer.vehicles.length > 0
+                          ? ` (${duplicateCustomer.vehicles.length} vehicle${duplicateCustomer.vehicles.length > 1 ? 's' : ''}: ${duplicateCustomer.vehicles.map((v) => v.vehicleNumber).join(', ')})`
+                          : ''}.
+                        Duplicate registrations are <strong>not allowed</strong>. Please use another mobile number or view the existing customer.
+                      </p>
+                    </div>
                   </div>
                   <Link
-                    to={`/customers/${existingCustomer.id}`}
+                    to={`/customers/${duplicateCustomer.id}`}
                     target="_blank"
-                    className="ml-3 shrink-0 underline font-semibold hover:text-indigo-700"
+                    className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl transition-colors shrink-0 shadow-sm"
                   >
-                    View Profile &rarr;
+                    View Existing Profile &rarr;
                   </Link>
                 </div>
               )}
@@ -388,35 +459,49 @@ export default function CustomerRegistrationPage() {
                         const sanitized = sanitizePhoneInput(e.target.value);
                         setPhoneNumber(sanitized);
                         if (phoneError) setPhoneError('');
+                        if (duplicateCustomer) setDuplicateCustomer(null);
+                        if (isPhoneAvailable) setIsPhoneAvailable(false);
                       }}
                       onBlur={() => {
                         if (phoneNumber.trim()) {
                           const res = validatePhoneNumber(phoneNumber);
                           if (!res.valid) {
                             setPhoneError(res.error || 'Invalid mobile number');
+                          } else if (duplicateCustomer) {
+                            setPhoneError(`This number is already registered to ${duplicateCustomer.name}. Duplicate numbers are not allowed.`);
                           } else {
                             setPhoneError('');
                           }
                         }
                       }}
                       className={`w-full px-4 py-3 rounded-xl border ${
-                        phoneError ? 'border-rose-500 ring-1 ring-rose-500' : 'border-slate-200 dark:border-slate-700'
+                        phoneError || duplicateCustomer
+                          ? 'border-rose-500 ring-1 ring-rose-500 text-rose-900 dark:text-rose-100'
+                          : isPhoneAvailable
+                          ? 'border-emerald-500 ring-1 ring-emerald-500'
+                          : 'border-slate-200 dark:border-slate-700'
                       } bg-white dark:bg-slate-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors font-mono font-medium`}
                       placeholder="9876543210"
                     />
                     {isCheckingPhone ? (
                       <div className="absolute right-3 top-3.5 w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-                    ) : phoneNumber.length === 10 && /^[6-9]/.test(phoneNumber) ? (
-                      <div className="absolute right-3 top-3.5 text-emerald-500 font-bold text-sm">
+                    ) : duplicateCustomer ? (
+                      <div className="absolute right-3 top-3.5 text-rose-500 font-bold text-sm" title="Duplicate Number Blocked">
+                        ✕
+                      </div>
+                    ) : isPhoneAvailable ? (
+                      <div className="absolute right-3 top-3.5 text-emerald-500 font-bold text-sm" title="Number Available">
                         ✓
                       </div>
                     ) : null}
                   </div>
                   {phoneError ? (
-                    <p className="mt-1.5 text-xs text-rose-500 font-medium">{phoneError}</p>
-                  ) : phoneNumber.length === 10 && /^[6-9]/.test(phoneNumber) ? (
+                    <p className="mt-1.5 text-xs text-rose-500 font-medium flex items-center gap-1">
+                      <span>⚠️</span> {phoneError}
+                    </p>
+                  ) : isPhoneAvailable ? (
                     <p className="mt-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
-                      Valid 10-digit Indian mobile number
+                      <span>✓</span> Mobile number is available for new registration
                     </p>
                   ) : (
                     <p className="mt-1 text-[11px] text-slate-500">
@@ -809,14 +894,21 @@ export default function CustomerRegistrationPage() {
 
                 <button
                   type="submit"
-                  disabled={isSubmitting}
-                  className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-8 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl text-sm font-bold shadow-lg shadow-emerald-500/25 transition-all disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer hover:-translate-y-0.5"
+                  disabled={isSubmitting || !!duplicateCustomer || isCheckingPhone}
+                  className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-8 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl text-sm font-bold shadow-lg shadow-emerald-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer hover:-translate-y-0.5"
                 >
                   {isSubmitting ? (
                     <>
                       <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                       Registering...
                     </>
+                  ) : isCheckingPhone ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Checking Phone...
+                    </>
+                  ) : duplicateCustomer ? (
+                    'Duplicate Number – Cannot Register'
                   ) : (
                     `Complete Registration (${vehicles.length} ${vehicles.length === 1 ? 'Vehicle' : 'Vehicles'})`
                   )}

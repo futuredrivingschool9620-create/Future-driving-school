@@ -17,6 +17,9 @@ router.post('/upload-pdf/preview', CustomerBatchController.preview);
 router.post('/upload-pdf/confirm', CustomerBatchController.confirm);
 router.get('/upload-pdf/sample', CustomerBatchController.downloadSample);
 
+// Check duplicate phone number (must be before /:id)
+router.get('/check-phone/:phone', CustomerController.checkPhone);
+
 router.get('/', CustomerController.getAll);
 router.get('/:id', CustomerController.getById);
 router.post('/', validate(createCustomerSchema), CustomerController.create);
