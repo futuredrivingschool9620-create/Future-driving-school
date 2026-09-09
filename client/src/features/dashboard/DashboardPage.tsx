@@ -462,7 +462,7 @@ export default function DashboardPage() {
                           )}
                         </div>
 
-                        {/* Mobile Number / Primary Key Highlight */}
+                        {/* Mobile Number Highlight */}
                         <div className="mt-1.5">
                           <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition-all ${
                             isSameName
@@ -475,11 +475,6 @@ export default function DashboardPage() {
                             <span className={isSameName ? 'font-mono tracking-wider' : ''}>
                               {customer.phoneNumber}
                             </span>
-                            {isSameName && (
-                              <span className="ml-1 text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-500 text-white tracking-normal">
-                                Primary Key
-                              </span>
-                            )}
                           </div>
                         </div>
                       </div>

@@ -261,11 +261,6 @@ export default function CustomerListPage() {
                             : 'text-slate-900 dark:text-slate-300'
                         }`}>
                           <span>{customer.phoneNumber}</span>
-                          {isSameName && (
-                            <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-500 text-white tracking-normal">
-                              Primary Key
-                            </span>
-                          )}
                         </div>
                       </td>
                     <td className="px-6 py-4">
