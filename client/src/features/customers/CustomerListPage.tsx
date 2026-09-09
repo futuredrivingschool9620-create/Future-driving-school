@@ -216,25 +216,11 @@ export default function CustomerListPage() {
                 </tr>
               ) : (
                 customers.map((customer: Customer) => {
-                  const isSameName = customers.some(
-                    (other) =>
-                      other.id !== customer.id &&
-                      ((customer.firstName && other.firstName && customer.firstName.trim().toLowerCase() === other.firstName.trim().toLowerCase() &&
-                        (customer.secondName || '').trim().toLowerCase() === (other.secondName || '').trim().toLowerCase()) ||
-                       (customer.fullName && other.fullName && customer.fullName.trim().toLowerCase() === other.fullName.trim().toLowerCase()))
-                  );
-
                   return (
-                    <tr key={customer.id} className={`transition-colors ${
-                      isSameName ? 'bg-amber-50/30 dark:bg-amber-950/20 hover:bg-amber-50/60 dark:hover:bg-amber-950/40' : 'hover:bg-slate-50/80 dark:hover:bg-slate-800/80'
-                    }`}>
+                    <tr key={customer.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/80 transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
-                          <div className={`h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                            isSameName
-                              ? 'bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-sm'
-                              : 'bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/50 dark:to-purple-900/50 text-indigo-700 dark:text-indigo-300'
-                          }`}>
+                          <div className="h-10 w-10 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/50 dark:to-purple-900/50 text-indigo-700 dark:text-indigo-300 flex items-center justify-center flex-shrink-0">
                             <span className="font-bold text-sm">
                               {customer.firstName.charAt(0)}{(customer.secondName || '').charAt(0)}
                             </span>
@@ -244,11 +230,6 @@ export default function CustomerListPage() {
                               <div className="text-sm font-semibold text-slate-900 dark:text-white">
                                 {customer.fullName || [customer.firstName, customer.secondName].filter(Boolean).join(' ') || customer.firstName}
                               </div>
-                              {isSameName && (
-                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
-                                  Same Name
-                                </span>
-                              )}
                             </div>
                             <div className="text-xs text-slate-500 mt-0.5">
                               Added {new Date(customer.createdAt).toLocaleDateString('en-IN')}
@@ -258,11 +239,7 @@ export default function CustomerListPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex flex-col gap-1">
-                          <div className={`text-sm inline-flex items-center gap-1.5 ${
-                            isSameName
-                              ? 'px-2.5 py-1 rounded-lg bg-amber-100/90 dark:bg-amber-950/80 border-2 border-amber-500 text-amber-900 dark:text-amber-200 font-mono font-bold shadow-xs'
-                              : 'text-slate-900 dark:text-slate-300 font-mono'
-                          }`}>
+                          <div className="text-sm text-slate-900 dark:text-slate-300 font-mono">
                             <span>{customer.phoneNumber}</span>
                           </div>
                           {!validatePhoneNumber(customer.phoneNumber).valid && (

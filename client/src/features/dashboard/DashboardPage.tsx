@@ -413,14 +413,6 @@ export default function DashboardPage() {
           ) : (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {searchResults.map((customer) => {
-                const isSameName = searchResults.some(
-                  (other) =>
-                    other.id !== customer.id &&
-                    ((customer.firstName && other.firstName && customer.firstName.trim().toLowerCase() === other.firstName.trim().toLowerCase() &&
-                      (customer.secondName || '').trim().toLowerCase() === (other.secondName || '').trim().toLowerCase()) ||
-                     (customer.fullName && other.fullName && customer.fullName.trim().toLowerCase() === other.fullName.trim().toLowerCase()))
-                );
-
                 const vehicles = (customer.vehicles && customer.vehicles.length > 0)
                   ? customer.vehicles
                   : customer.vehicleNumber
@@ -431,22 +423,12 @@ export default function DashboardPage() {
                   <div
                     key={customer.id}
                     onClick={() => navigate(`/customers/${customer.id}`)}
-                    className={`group glass-card p-5 cursor-pointer relative overflow-hidden hover:-translate-y-1 hover:shadow-xl transition-all duration-300 ${
-                      isSameName
-                        ? 'border-2 border-amber-400/90 dark:border-amber-500/80 shadow-md shadow-amber-500/10'
-                        : 'hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-indigo-500/10'
-                    }`}
+                    className="group glass-card p-5 cursor-pointer relative overflow-hidden hover:-translate-y-1 hover:shadow-xl transition-all duration-300 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-indigo-500/10"
                   >
-                    <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${
-                      isSameName ? 'from-amber-500 via-orange-500 to-amber-500' : 'from-indigo-500 to-purple-500'
-                    } scale-x-0 group-hover:scale-x-100 origin-left transition-transform duration-300`} />
+                    <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-indigo-500 to-purple-500 scale-x-0 group-hover:scale-x-100 origin-left transition-transform duration-300" />
                     
                     <div className="flex items-start gap-4">
-                      <div className={`w-12 h-12 shrink-0 rounded-xl flex items-center justify-center font-bold text-sm text-white shadow-md ${
-                        isSameName
-                          ? 'bg-gradient-to-br from-amber-500 to-orange-600 shadow-amber-500/30'
-                          : 'bg-gradient-to-br from-indigo-500 to-purple-600 shadow-indigo-500/30'
-                      }`}>
+                      <div className="w-12 h-12 shrink-0 rounded-xl flex items-center justify-center font-bold text-sm text-white shadow-md bg-gradient-to-br from-indigo-500 to-purple-600 shadow-indigo-500/30">
                         {getInitials(customer.firstName, customer.secondName)}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -454,25 +436,15 @@ export default function DashboardPage() {
                           <h4 className="font-bold text-base truncate" style={{ color: 'var(--color-text-primary)' }}>
                             {customer.firstName} {customer.secondName}
                           </h4>
-                          {isSameName && (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700 shadow-xs">
-                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                              Same Name
-                            </span>
-                          )}
                         </div>
 
-                        {/* Mobile Number Highlight */}
+                        {/* Mobile Number */}
                         <div className="mt-1.5">
-                          <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition-all ${
-                            isSameName
-                              ? 'bg-amber-100/90 dark:bg-amber-950/80 text-amber-900 dark:text-amber-200 border-2 border-amber-500 font-mono font-bold shadow-xs'
-                              : 'text-sm text-slate-600 dark:text-slate-400'
-                          }`}>
-                            <svg className={`w-3.5 h-3.5 ${isSameName ? 'text-amber-600 dark:text-amber-400 animate-pulse' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                          <div className="inline-flex items-center gap-1.5 text-sm text-slate-600 dark:text-slate-400">
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 0 0 2.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 0 1-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 0 0-1.091-.852H4.5A2.25 2.25 0 0 0 2.25 4.5v2.25Z" />
                             </svg>
-                            <span className={isSameName ? 'font-mono tracking-wider' : ''}>
+                            <span>
                               {customer.phoneNumber}
                             </span>
                           </div>
