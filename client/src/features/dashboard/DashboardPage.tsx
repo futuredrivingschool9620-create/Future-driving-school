@@ -412,45 +412,159 @@ export default function DashboardPage() {
             </div>
           ) : (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {searchResults.map((customer) => (
-                <div
-                  key={customer.id}
-                  onClick={() => navigate(`/customers/${customer.id}`)}
-                  className="group glass-card p-5 cursor-pointer relative overflow-hidden hover:-translate-y-1 hover:shadow-xl hover:shadow-indigo-500/10 hover:border-indigo-300 dark:hover:border-indigo-700 transition-all duration-300"
-                >
-                  <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-indigo-500 to-purple-500 scale-x-0 group-hover:scale-x-100 origin-left transition-transform duration-300" />
-                  <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 shrink-0 rounded-xl flex items-center justify-center font-bold text-sm text-white bg-gradient-to-br from-indigo-500 to-purple-600 shadow-md shadow-indigo-500/30">
-                      {getInitials(customer.firstName, customer.secondName)}
+              {searchResults.map((customer) => {
+                const isSameName = searchResults.some(
+                  (other) =>
+                    other.id !== customer.id &&
+                    ((customer.firstName && other.firstName && customer.firstName.trim().toLowerCase() === other.firstName.trim().toLowerCase() &&
+                      (customer.secondName || '').trim().toLowerCase() === (other.secondName || '').trim().toLowerCase()) ||
+                     (customer.fullName && other.fullName && customer.fullName.trim().toLowerCase() === other.fullName.trim().toLowerCase()))
+                );
+
+                const vehicles = (customer.vehicles && customer.vehicles.length > 0)
+                  ? customer.vehicles
+                  : customer.vehicleNumber
+                  ? [{ id: 'legacy', vehicleNumber: customer.vehicleNumber, vehicleType: customer.vehicleType, status: 'Active' }]
+                  : [];
+
+                return (
+                  <div
+                    key={customer.id}
+                    onClick={() => navigate(`/customers/${customer.id}`)}
+                    className={`group glass-card p-5 cursor-pointer relative overflow-hidden hover:-translate-y-1 hover:shadow-xl transition-all duration-300 ${
+                      isSameName
+                        ? 'border-2 border-amber-400/90 dark:border-amber-500/80 shadow-md shadow-amber-500/10'
+                        : 'hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-indigo-500/10'
+                    }`}
+                  >
+                    <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${
+                      isSameName ? 'from-amber-500 via-orange-500 to-amber-500' : 'from-indigo-500 to-purple-500'
+                    } scale-x-0 group-hover:scale-x-100 origin-left transition-transform duration-300`} />
+                    
+                    <div className="flex items-start gap-4">
+                      <div className={`w-12 h-12 shrink-0 rounded-xl flex items-center justify-center font-bold text-sm text-white shadow-md ${
+                        isSameName
+                          ? 'bg-gradient-to-br from-amber-500 to-orange-600 shadow-amber-500/30'
+                          : 'bg-gradient-to-br from-indigo-500 to-purple-600 shadow-indigo-500/30'
+                      }`}>
+                        {getInitials(customer.firstName, customer.secondName)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="font-bold text-base truncate" style={{ color: 'var(--color-text-primary)' }}>
+                            {customer.firstName} {customer.secondName}
+                          </h4>
+                          {isSameName && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700 shadow-xs">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                              Same Name
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Mobile Number / Primary Key Highlight */}
+                        <div className="mt-1.5">
+                          <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition-all ${
+                            isSameName
+                              ? 'bg-amber-100/90 dark:bg-amber-950/80 text-amber-900 dark:text-amber-200 border-2 border-amber-500 font-mono font-bold shadow-xs'
+                              : 'text-sm text-slate-600 dark:text-slate-400'
+                          }`}>
+                            <svg className={`w-3.5 h-3.5 ${isSameName ? 'text-amber-600 dark:text-amber-400 animate-pulse' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 0 0 2.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 0 1-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 0 0-1.091-.852H4.5A2.25 2.25 0 0 0 2.25 4.5v2.25Z" />
+                            </svg>
+                            <span className={isSameName ? 'font-mono tracking-wider' : ''}>
+                              {customer.phoneNumber}
+                            </span>
+                            {isSameName && (
+                              <span className="ml-1 text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-500 text-white tracking-normal">
+                                Primary Key
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <svg
+                        className="w-5 h-5 shrink-0 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300 text-indigo-500"
+                        fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
+                      </svg>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-semibold text-base truncate" style={{ color: 'var(--color-text-primary)' }}>
-                        {customer.firstName} {customer.secondName}
-                      </h4>
-                      <p className="text-sm mt-0.5 flex items-center gap-1.5" style={{ color: 'var(--color-text-muted)' }}>
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 0 0 2.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 0 1-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 0 0-1.091-.852H4.5A2.25 2.25 0 0 0 2.25 4.5v2.25Z" />
-                        </svg>
-                        {customer.phoneNumber}
-                      </p>
-                    </div>
-                    <svg
-                      className="w-5 h-5 shrink-0 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300 text-indigo-500"
-                      fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
-                    </svg>
+
+                    {/* Vehicles Section: Display below each other when 2 or more */}
+                    {vehicles.length >= 2 ? (
+                      <div className="mt-4 pt-3 space-y-2" style={{ borderTop: '1px solid var(--color-border)' }}>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] uppercase tracking-wider font-semibold flex items-center gap-1.5" style={{ color: 'var(--color-text-muted)' }}>
+                            Vehicles ({vehicles.length})
+                          </span>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                            Multi-Vehicle
+                          </span>
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          {vehicles.map((v, vIdx) => (
+                            <div
+                              key={v.id || vIdx}
+                              className="flex items-center justify-between p-2 rounded-lg bg-slate-50 dark:bg-slate-800/70 border border-slate-200/70 dark:border-slate-700/70 hover:border-indigo-400 dark:hover:border-indigo-600 transition-colors"
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="w-5 h-5 rounded-md bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 text-[10px] font-bold flex items-center justify-center">
+                                  {vIdx + 1}
+                                </span>
+                                <span className="font-mono text-xs font-bold text-slate-800 dark:text-slate-200 tracking-wider">
+                                  {v.vehicleNumber}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                {v.vehicleType && (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-200/70 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-semibold">
+                                    {v.vehicleType}
+                                  </span>
+                                )}
+                                {v.status && (
+                                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                                    v.status === 'Active'
+                                      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300'
+                                      : v.status === 'Expired'
+                                      ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/80 dark:text-rose-300'
+                                      : 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950/80 dark:text-indigo-300'
+                                  }`}>
+                                    {v.status}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : vehicles.length === 1 ? (
+                      <div className="mt-4 pt-3 flex items-center justify-between" style={{ borderTop: '1px solid var(--color-border)' }}>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[11px] uppercase tracking-wider font-semibold" style={{ color: 'var(--color-text-muted)' }}>
+                            Vehicle
+                          </span>
+                          {vehicles[0].vehicleType && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 font-medium">
+                              {vehicles[0].vehicleType}
+                            </span>
+                          )}
+                        </div>
+                        <span className="font-mono text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 tracking-wider border border-slate-200/80 dark:border-slate-700/80 shadow-xs">
+                          {vehicles[0].vehicleNumber}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="mt-4 pt-3 flex items-center justify-between" style={{ borderTop: '1px solid var(--color-border)' }}>
+                        <span className="text-[11px] uppercase tracking-wider font-semibold" style={{ color: 'var(--color-text-muted)' }}>
+                          Vehicle
+                        </span>
+                        <span className="text-xs text-slate-400 italic">None</span>
+                      </div>
+                    )}
                   </div>
-                  <div className="mt-4 pt-3 flex items-center justify-between" style={{ borderTop: '1px solid var(--color-border)' }}>
-                    <span className="text-[11px] uppercase tracking-wider font-semibold" style={{ color: 'var(--color-text-muted)' }}>
-                      Vehicle
-                    </span>
-                    <span className="font-mono text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 tracking-wider">
-                      {customer.vehicleNumber}
-                    </span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
