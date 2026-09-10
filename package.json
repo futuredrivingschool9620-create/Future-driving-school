@@ -1,6 +1,6 @@
 {
   "name": "future-driving-school",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Future Driving School - Windows Desktop Management Application",
   "main": "electron/main.cjs",
   "private": true,
@@ -13,7 +13,8 @@
     "dev:client": "npm run dev --workspace=client",
     "dev:server": "npm run dev --workspace=server",
     "dev:electron": "concurrently \"npm run dev:server\" \"npm run dev:client\" \"wait-on http://localhost:5173 && electron .\"",
-    "build": "npm run build --workspace=client && npm run build --workspace=server",
+    "build": "npm run build --workspace=client && npm run build:server",
+    "build:server": "npm run build --workspace=server && npm install --prefix server --omit=dev --no-workspaces && npx prisma generate --schema=server/prisma/schema.prisma",
     "build:electron": "electron-builder --dir",
     "dist:win": "npm run build && electron-builder --win --x64",
     "db:migrate": "npm run db:migrate --workspace=server",

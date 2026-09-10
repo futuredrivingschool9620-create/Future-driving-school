@@ -107,6 +107,7 @@ export default function CustomerEditPage() {
 
     setError('');
     setIsSubmitting(true);
+    
 
     const pResult = validatePhoneNumber(phoneNumber);
     if (!pResult.valid) {

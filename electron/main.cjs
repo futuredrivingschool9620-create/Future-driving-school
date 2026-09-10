@@ -50,6 +50,11 @@ function startServer() {
       logStream.write(`[Server Error]: ${msg}\n`);
     });
 
+    serverProcess.on('error', (err) => {
+      console.error('[Server spawn error]:', err);
+      logStream.write(`[Server spawn error]: ${err.message}\n`);
+    });
+
     serverProcess.on('close', (code) => {
       console.log(`[Server] exited with code ${code}`);
       logStream.write(`[Server] exited with code ${code}\n`);
@@ -63,16 +68,19 @@ function waitForServer(callback, maxAttempts = 30) {
     attempts++;
     http.get('http://localhost:3001/api/health', (res) => {
       if (res.statusCode === 200) {
+        console.log(`[Server] Health check passed on attempt ${attempts}`);
         callback();
       } else if (attempts < maxAttempts) {
         setTimeout(check, 500);
       } else {
+        console.warn(`[Server] Health check timed out after ${maxAttempts} attempts`);
         callback();
       }
-    }).on('error', () => {
+    }).on('error', (err) => {
       if (attempts < maxAttempts) {
         setTimeout(check, 500);
       } else {
+        console.warn(`[Server] Health check failed after ${maxAttempts} attempts:`, err.message);
         callback();
       }
     });

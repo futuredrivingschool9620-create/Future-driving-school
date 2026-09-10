@@ -9,6 +9,8 @@ dist-electron/
 **/.env.*
 !.env.example
 !**/.env.example
+!.env.production
+!**/.env.production
 *.log
 **/*.log
 test-*.cjs

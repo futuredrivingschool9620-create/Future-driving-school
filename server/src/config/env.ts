@@ -83,7 +83,7 @@ function loadEnv(): Env {
   if (!result.success) {
     console.error('❌ Invalid environment variables:');
     console.error(result.error.flatten().fieldErrors);
-    process.exit(1);
+    throw new Error('Invalid environment variables. Check server logs for details.');
   }
 
   return result.data;
