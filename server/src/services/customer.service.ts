@@ -335,7 +335,7 @@ export class CustomerService {
       return { data: [], pagination: { page, limit, total: 0, totalPages: 0 } };
     }
 
-    const cleanedTerm = searchTerm.replace(/[\s\-]/g, '');
+    const cleanedTerm = searchTerm.replace(/[\s\-]/g, '').toUpperCase();
     const formattedTerm = validateAndFormatVehicleNumber(searchTerm);
 
     // Customer name & phone conditions

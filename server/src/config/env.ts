@@ -64,6 +64,7 @@ const envSchema = z.object({
   WHATSAPP_API_URL: z.string().default(''),
   WHATSAPP_API_TOKEN: z.string().default(''),
   WHATSAPP_PHONE_NUMBER_ID: z.string().default(''),
+  WHATSAPP_TEMPLATE_NAME: z.string().default('renewal_reminder'),
 
   // SMS Gateway
   SMS_ENABLED: z

@@ -20,6 +20,7 @@ export const VALID_INDIAN_STATE_CODES = [
 const indianStateCodesSet = new Set<string>(VALID_INDIAN_STATE_CODES);
 const regexWithSeries = /^([A-Z]{2})[\s\-]*([0-9]{1,2})[\s\-]*([A-Z]{1,3})[\s\-]*([0-9]{1,4})$/;
 const regexWithoutSeries = /^([A-Z]{2})[\s\-]+([0-9]{1,2})[\s\-]+([0-9]{1,4})$/;
+const regexSimple = /^([A-Z]{2})([0-9]{1,2})[\s\-]*([0-9]{1,4})$/;
 
 export function validateAndFormatVehicleNumber(input: string): { valid: boolean; formatted?: string; error?: string } {
   if (!input || typeof input !== 'string') {
@@ -35,6 +36,14 @@ export function validateAndFormatVehicleNumber(input: string): { valid: boolean;
     return { valid: true, formatted: `${state} ${rto.padStart(2, '0')} ${series} ${num}` };
   }
   match = cleaned.match(regexWithoutSeries);
+  if (match) {
+    const [, state, rto, num] = match;
+    if (!indianStateCodesSet.has(state)) {
+      return { valid: false, error: `Invalid Indian State/UT code: ${state}. Must be a valid Indian registration code (e.g. KA, MH, TN, DL, etc.)` };
+    }
+    return { valid: true, formatted: `${state} ${rto.padStart(2, '0')} ${num}` };
+  }
+  match = cleaned.match(regexSimple);
   if (match) {
     const [, state, rto, num] = match;
     if (!indianStateCodesSet.has(state)) {

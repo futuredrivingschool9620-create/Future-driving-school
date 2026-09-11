@@ -161,9 +161,19 @@ export class SchedulerService {
         let sent = false;
 
         if (env.WHATSAPP_ENABLED) {
-          const result = await WhatsAppService.sendMessage(
+          const daysStr = daysRemaining === 0 ? '0 days (TODAY)' : daysRemaining === 1 ? '1 day (TOMORROW)' : `${daysRemaining} days`;
+          const params = [
+            customerName,
+            targetVehicleNumber,
+            doc.documentName,
+            formatDateIN(doc.endDate),
+            daysStr
+          ];
+
+          const result = await WhatsAppService.sendTemplate(
             doc.customer.phoneNumber,
-            message
+            env.WHATSAPP_TEMPLATE_NAME,
+            params
           );
           if (result.success) {
             await NotificationService.markSent(notification.id, result.messageId);
@@ -209,14 +219,26 @@ export class SchedulerService {
     daysRemaining: number,
     expiryDate: string
   ): string {
-    if (daysRemaining === 0) {
-      return `Dear ${customerName}, your ${documentType} for vehicle ${vehicleNumber} expires TODAY (${expiryDate}). Please renew immediately. — Future Driving School`;
-    }
+    const daysStr = daysRemaining === 0 ? '0 days (TODAY)' : daysRemaining === 1 ? '1 day (TOMORROW)' : `${daysRemaining} days`;
 
-    if (daysRemaining === 1) {
-      return `Dear ${customerName}, your ${documentType} for vehicle ${vehicleNumber} expires TOMORROW (${expiryDate}). Please renew as soon as possible. — Future Driving School`;
-    }
+    return `MD MUBARAK (RTO 55)
 
-    return `Dear ${customerName}, your ${documentType} for vehicle ${vehicleNumber} will expire in ${daysRemaining} days (${expiryDate}). Please plan for renewal. — Future Driving School`;
+Future Driving School – Renewal Reminder
+
+Dear ${customerName},
+
+This is a reminder regarding your vehicle ${vehicleNumber}.
+
+📄 DOCUMENT: ${documentType}
+📅 EXPIRY DATE: ${expiryDate}
+⚠️ DAYS REMAINING: ${daysStr}
+
+Please arrange for renewal before the expiry date.
+
+📞 FOR RENEWAL / ASSISTANCE:
+Future Driving School 
+8317370659 / 9620463722 
+                                                                   
+Thank you for choosing Future Driving School.`;
   }
 }

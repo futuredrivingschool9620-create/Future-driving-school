@@ -20,7 +20,7 @@ export class VehicleService {
       throw new NotFoundError('Customer not found');
     }
 
-    const formattedVehicleNumber = data.vehicleNumber.trim().toUpperCase();
+    const formattedVehicleNumber = data.vehicleNumber.replace(/[\s\-]/g, '').toUpperCase();
 
     // Check if this vehicle number is already registered and active
     const existingActiveVehicle = await prisma.vehicle.findFirst({
@@ -232,7 +232,7 @@ export class VehicleService {
     }
 
     if (data.vehicleNumber) {
-      const formatted = data.vehicleNumber.trim().toUpperCase();
+      const formatted = data.vehicleNumber.replace(/[\s\-]/g, '').toUpperCase();
       if (formatted !== existing.vehicleNumber) {
         const conflict = await prisma.vehicle.findFirst({
           where: {
@@ -250,7 +250,7 @@ export class VehicleService {
     const updated = await prisma.vehicle.update({
       where: { id },
       data: {
-        ...(data.vehicleNumber && { vehicleNumber: data.vehicleNumber.trim().toUpperCase() }),
+        ...(data.vehicleNumber && { vehicleNumber: data.vehicleNumber.replace(/[\s\-]/g, '').toUpperCase() }),
         ...(data.vehicleType && { vehicleType: data.vehicleType }),
         ...(data.status && { status: data.status }),
         ...(data.notes !== undefined && { notes: data.notes || null }),
