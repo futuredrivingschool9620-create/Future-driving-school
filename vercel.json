@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npm run build --workspace=client && npm run build --workspace=server && npx prisma generate --schema=server/prisma/schema.prisma",
+  "buildCommand": "npx prisma generate --schema=server/prisma/schema.prisma && npm run build --workspace=client && npm run build --workspace=server",
   "outputDirectory": "client/dist",
   "functions": {
     "api/**/*.ts": {
