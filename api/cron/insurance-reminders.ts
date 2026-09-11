@@ -78,6 +78,30 @@ async function sendWhatsAppTemplate(
   try {
     const url = `${apiUrl}/${phoneNumberId}/messages`;
 
+    const templateLang = process.env.WHATSAPP_TEMPLATE_LANG || 'en_US';
+    const headerImageUrl = process.env.WHATSAPP_HEADER_IMAGE_URL;
+
+    const components: any[] = [];
+
+    // If template has an image header, attach the image link
+    if (headerImageUrl) {
+      components.push({
+        type: 'header',
+        parameters: [
+          {
+            type: 'image',
+            image: { link: headerImageUrl },
+          },
+        ],
+      });
+    }
+
+    // Body parameters: {{1}}, {{2}}, {{3}}, {{4}}
+    components.push({
+      type: 'body',
+      parameters: params.map((p) => ({ type: 'text', text: p })),
+    });
+
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -90,13 +114,8 @@ async function sendWhatsAppTemplate(
         type: 'template',
         template: {
           name: templateName,
-          language: { code: 'en' },
-          components: [
-            {
-              type: 'body',
-              parameters: params.map((p) => ({ type: 'text', text: p })),
-            },
-          ],
+          language: { code: templateLang },
+          components,
         },
       }),
     });
