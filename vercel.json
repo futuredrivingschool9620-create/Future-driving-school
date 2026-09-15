@@ -1,6 +1,5 @@
 {
-  "installCommand": "npm install",
-  "buildCommand": "ls -la && npm run db:generate --workspace=server && npm run build --workspace=client",
+  "buildCommand": "npx prisma@^6.9.0 generate --schema=server/prisma/schema.prisma && npm run build --workspace=client",
   "outputDirectory": "client/dist",
   "functions": {
     "api/**/*.ts": {
