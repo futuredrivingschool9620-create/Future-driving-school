@@ -3,21 +3,35 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 const candidates = [
   process.env.DOTENV_CONFIG_PATH,
   path.resolve(process.cwd(), '.env'),
   path.resolve(process.cwd(), 'server', '.env'),
-  path.resolve(__dirname, '..', '..', '.env'),
-  path.resolve(__dirname, '..', '.env'),
-  (process as any).resourcesPath ? path.join((process as any).resourcesPath, 'server', '.env') : null,
-  (process as any).resourcesPath ? path.join((process as any).resourcesPath, '.env') : null,
-].filter(Boolean) as string[];
+];
+
+try {
+  // ESM - might throw in Vercel CJS
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+  candidates.push(
+    path.resolve(__dirname, '..', '..', '.env'),
+    path.resolve(__dirname, '..', '.env')
+  );
+} catch (e) {
+  // Ignore
+}
+
+if ((process as any).resourcesPath) {
+  candidates.push(
+    path.join((process as any).resourcesPath, 'server', '.env'),
+    path.join((process as any).resourcesPath, '.env')
+  );
+}
+
+const validCandidates = candidates.filter(Boolean) as string[];
 
 let loaded = false;
-for (const p of candidates) {
+for (const p of validCandidates) {
   if (fs.existsSync(p)) {
     dotenv.config({ path: p });
     loaded = true;
