@@ -211,7 +211,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const vehicleNumber = doc.vehicle.vehicleNumber || doc.customer.vehicleNumber || 'N/A';
       const phoneNumber   = doc.customer.phoneNumber;
 
-      // 4. Duplicate guard (matches the DB @@unique constraint)
+      // 4. Duplicate guard: skip if already sent or successfully queued today
       const existing = await prisma.notification.findFirst({
         where: {
           customerId: doc.customerId,
@@ -219,11 +219,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           reminderType: reminderTypeStr as any,
           currentExpiryDate: doc.endDate,
           calendarDay: today,
+          notificationStatus: {
+            not: 'FAILED'
+          }
         },
       });
 
       if (existing) {
-        console.log(`  ⏭  Skip (duplicate): ${customerName} | ${vehicleNumber} | ${reminderTypeStr}`);
+        console.log(`  ⏭  Skip (already processed today): ${customerName} | ${vehicleNumber} | ${reminderTypeStr}`);
         skipped++;
         continue;
       }

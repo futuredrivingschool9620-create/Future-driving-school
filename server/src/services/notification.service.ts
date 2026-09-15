@@ -92,6 +92,9 @@ export class NotificationService {
         reminderType,
         currentExpiryDate,
         calendarDay,
+        notificationStatus: {
+          not: 'FAILED'
+        }
       },
     });
     return !!existing;
