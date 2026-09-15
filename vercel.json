@@ -1,6 +1,6 @@
 {
   "installCommand": "npm install",
-  "buildCommand": "cd server && npx prisma@^6.9.0 generate && cd .. && npm run build --workspace=client",
+  "buildCommand": "ls -la && npm run db:generate --workspace=server && npm run build --workspace=client",
   "outputDirectory": "client/dist",
   "functions": {
     "api/**/*.ts": {
