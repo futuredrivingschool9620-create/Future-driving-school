@@ -1,7 +1,5 @@
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
-const { PDFParse } = require('pdf-parse');
-
 export interface ParsedCustomerRecord {
   tempId: string;
   firstName: string;
@@ -22,6 +20,7 @@ export class PdfParserService {
    * Parse PDF buffer and extract structured customer records.
    */
   static async parsePdf(buffer: Buffer): Promise<ParsedCustomerRecord[]> {
+    const { PDFParse } = require('pdf-parse');
     const parser = new PDFParse({ data: buffer });
     await parser.load();
 
