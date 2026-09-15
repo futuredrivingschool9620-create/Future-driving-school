@@ -161,11 +161,11 @@ export class SchedulerService {
         let sent = false;
 
         if (env.WHATSAPP_ENABLED) {
-          const daysStr = daysRemaining === 0 ? '0 days (TODAY)' : daysRemaining === 1 ? '1 day (TOMORROW)' : `${daysRemaining} days`;
+          const daysStr = daysRemaining === 0 ? '0 (TODAY)' : daysRemaining === 1 ? '1 (TOMORROW)' : `${daysRemaining}`;
           const params = [
             customerName,
             targetVehicleNumber,
-            doc.documentName,
+            doc.documentName || 'Document',
             formatDateIN(doc.endDate),
             daysStr
           ];

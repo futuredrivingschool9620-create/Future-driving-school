@@ -230,11 +230,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // 5. Build plain-text message (stored in DB / SMS fallback)
       const daysStr =
-        daysRemaining === 0 ? '0 days (TODAY)'
-        : daysRemaining === 1 ? '1 day (TOMORROW)'
-        : `${daysRemaining} days`;
+        daysRemaining === 0 ? '0 (TODAY)'
+        : daysRemaining === 1 ? '1 (TOMORROW)'
+        : `${daysRemaining}`;
 
-      const message = buildMessage(customerName, vehicleNumber, formatDateIN(doc.endDate), daysStr);
+      const message = buildMessage(customerName, vehicleNumber, formatDateIN(doc.endDate), daysStr + ' days');
 
       // 6. Persist Notification record (PENDING)
       let notification;
@@ -272,12 +272,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // 7. Send WhatsApp template
       //   {{1}} → Customer full name
       //   {{2}} → Vehicle number plate
-      //   {{3}} → Expiry date (readable)
-      //   {{4}} → Days remaining
+      //   {{3}} → Document Name
+      //   {{4}} → Expiry date (readable)
+      //   {{5}} → Days remaining
       try {
         const templateParams = [
           customerName,
           vehicleNumber,
+          doc.documentName || 'Insurance',
           formatDateIN(doc.endDate),
           daysStr,
         ];
