@@ -211,7 +211,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const vehicleNumber = doc.vehicle.vehicleNumber || doc.customer.vehicleNumber || 'N/A';
       const phoneNumber   = doc.customer.phoneNumber;
 
-      // 4. Duplicate guard: skip if already sent or successfully queued today
+      // 4. Duplicate guard: skip if already successfully sent today
       const existing = await prisma.notification.findFirst({
         where: {
           customerId: doc.customerId,
@@ -219,14 +219,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           reminderType: reminderTypeStr as any,
           currentExpiryDate: doc.endDate,
           calendarDay: today,
-          notificationStatus: {
-            not: 'FAILED'
-          }
         },
       });
 
-      if (existing) {
-        console.log(`  ⏭  Skip (already processed today): ${customerName} | ${vehicleNumber} | ${reminderTypeStr}`);
+      if (existing && (existing.notificationStatus === 'SENT' || existing.notificationStatus === 'DELIVERED')) {
+        console.log(`  ⏭  Skip (already sent today): ${customerName} | ${vehicleNumber} | ${reminderTypeStr}`);
         skipped++;
         continue;
       }
@@ -239,35 +236,48 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       const message = buildMessage(customerName, vehicleNumber, formatDateIN(doc.endDate), daysStr + ' days');
 
-      // 6. Persist Notification record (PENDING)
+      // 6. Persist or reuse Notification record (PENDING)
       let notification;
-      try {
-        notification = await prisma.notification.create({
+      if (existing) {
+        // Reuse the existing record (e.g. if previous attempt failed today), resetting to PENDING
+        notification = await prisma.notification.update({
+          where: { id: existing.id },
           data: {
-            customerId:         doc.customerId,
-            vehicleId:          doc.vehicleId || null,
-            documentId:         doc.id,
-            customerName,
-            phoneNumber,
-            vehicleNumber,
-            documentType:       doc.documentName,
-            originalExpiryDate: doc.endDate,
-            currentExpiryDate:  doc.endDate,
-            reminderType:       reminderTypeStr as any,
-            message,
-            calendarDay:        today,
             notificationStatus: 'PENDING',
             deliveryStatus:     'QUEUED',
+            cancellationReason: null,
+            message,
           },
         });
-      } catch (dbErr: any) {
-        // P2002 = unique constraint violation (duplicate)
-        if (dbErr?.code === 'P2002') {
-          console.log(`  ⏭  Skip (DB duplicate): ${customerName} | ${vehicleNumber}`);
-          skipped++;
-          continue;
+      } else {
+        try {
+          notification = await prisma.notification.create({
+            data: {
+              customerId:         doc.customerId,
+              vehicleId:          doc.vehicleId || null,
+              documentId:         doc.id,
+              customerName,
+              phoneNumber,
+              vehicleNumber,
+              documentType:       doc.documentName,
+              originalExpiryDate: doc.endDate,
+              currentExpiryDate:  doc.endDate,
+              reminderType:       reminderTypeStr as any,
+              message,
+              calendarDay:        today,
+              notificationStatus: 'PENDING',
+              deliveryStatus:     'QUEUED',
+            },
+          });
+        } catch (dbErr: any) {
+          // P2002 = unique constraint violation (duplicate)
+          if (dbErr?.code === 'P2002') {
+            console.log(`  ⏭  Skip (DB duplicate): ${customerName} | ${vehicleNumber}`);
+            skipped++;
+            continue;
+          }
+          throw dbErr;
         }
-        throw dbErr;
       }
 
       notificationsCreated++;

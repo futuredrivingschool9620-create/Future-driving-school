@@ -93,7 +93,7 @@ export class NotificationService {
         currentExpiryDate,
         calendarDay,
         notificationStatus: {
-          not: 'FAILED'
+          in: ['SENT', 'DELIVERED']
         }
       },
     });
@@ -101,7 +101,7 @@ export class NotificationService {
   }
 
   /**
-   * Create a notification record.
+   * Create a notification record or reuse an existing failed record.
    */
   static async createNotification(data: {
     customerId: string;
@@ -118,6 +118,31 @@ export class NotificationService {
     calendarDay: Date;
   }) {
     try {
+      const existing = await prisma.notification.findFirst({
+        where: {
+          customerId: data.customerId,
+          documentId: data.documentId,
+          reminderType: data.reminderType,
+          currentExpiryDate: data.currentExpiryDate,
+          calendarDay: data.calendarDay,
+        },
+      });
+
+      if (existing) {
+        if (existing.notificationStatus === 'SENT' || existing.notificationStatus === 'DELIVERED') {
+          return null;
+        }
+        return await prisma.notification.update({
+          where: { id: existing.id },
+          data: {
+            notificationStatus: 'PENDING',
+            deliveryStatus: 'QUEUED',
+            cancellationReason: null,
+            message: data.message,
+          },
+        });
+      }
+
       return await prisma.notification.create({
         data: {
           customerId: data.customerId,
