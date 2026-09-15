@@ -3,56 +3,71 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const apiUrl = 'https://graph.facebook.com/v25.0';
   const apiToken = process.env.WHATSAPP_API_TOKEN?.trim().replace(/^["']|["']$/g, '') || '';
-  
-  // Real IDs from the user's WhatsApp Manager screenshot:
-  const realPhoneId = '1426657943854134';
-  const realWabaId = '1116030660847995';
-  const activeTemplateId = '1095764336727114';
+  const phoneId = '1426657943854134';
+  const testNumber = (req.query.to as string) || '918317370639'; // Admin phone or query param
 
   const results: any = {
-    realPhoneId,
-    realWabaId,
-    activeTemplateId,
+    phoneId,
+    testNumber,
   };
 
-  // 1. Check Phone Number ID
-  try {
-    const r = await fetch(`${apiUrl}/${realPhoneId}?fields=verified_name,display_phone_number,quality_rating,code_verification_status`, {
-      headers: { Authorization: `Bearer ${apiToken}` },
-    });
-    results.phone_check = await r.json();
-  } catch (e: any) {
-    results.phone_check = { error: e.message };
-  }
+  const defaultLogoUrl = 'https://raw.githubusercontent.com/futuredrivingschool9620-create/Future-driving-school/main/client/public/logo.png';
 
-  // 2. Check WABA
-  try {
-    const r = await fetch(`${apiUrl}/${realWabaId}?fields=id,name,currency,timezone_id`, {
-      headers: { Authorization: `Bearer ${apiToken}` },
-    });
-    results.waba_check = await r.json();
-  } catch (e: any) {
-    results.waba_check = { error: e.message };
-  }
+  // Test combinations of lang and headerImage
+  const langs = ['en', 'en_US', 'en_GB'];
+  results.tests = {};
 
-  // 3. Check Templates in this real WABA
-  try {
-    const r = await fetch(`${apiUrl}/${realWabaId}/message_templates?limit=50`, {
-      headers: { Authorization: `Bearer ${apiToken}` },
-    });
-    results.templates_check = await r.json();
-  } catch (e: any) {
-    results.templates_check = { error: e.message };
-  }
+  for (const lang of langs) {
+    for (const withHeader of [true, false]) {
+      const key = `${lang}_header_${withHeader}`;
+      try {
+        const components: any[] = [];
+        if (withHeader) {
+          components.push({
+            type: 'header',
+            parameters: [{ type: 'image', image: { link: defaultLogoUrl } }],
+          });
+        }
+        components.push({
+          type: 'body',
+          parameters: [
+            { type: 'text', text: 'Charan salanki' },
+            { type: 'text', text: 'KA09JP3222' },
+            { type: 'text', text: 'Insurance' },
+            { type: 'text', text: '20 Sep 2026' },
+            { type: 'text', text: '15 days' },
+          ],
+        });
 
-  // 4. Check the specific template directly
-  try {
-    const r = await fetch(`${apiUrl}/${activeTemplateId}?fields=name,status,language,components`, {
-      headers: { Authorization: `Bearer ${apiToken}` },
-    });
-    results.template_details = await r.json();
-  } catch (e: any) {
-    results.template_details = { error: e.message };
+        const r = await fetch(`${apiUrl}/${phoneId}/messages`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${apiToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            messaging_product: 'whatsapp',
+            to: testNumber.replace(/[^0-9]/g, ''),
+            type: 'template',
+            template: {
+              name: 'future_driving_school',
+              language: { code: lang },
+              components,
+            },
+          }),
+        });
+
+        const d = await r.json();
+        results.tests[key] = { status: r.status, data: d };
+
+        if (r.ok) {
+          results.SUCCESSFUL_CONFIG = { lang, withHeader, messageId: (d as any).messages?.[0]?.id };
+          return res.status(200).json(results);
+        }
+      } catch (e: any) {
+        results.tests[key] = { error: e.message };
+      }
+    }
   }
 
   return res.status(200).json(results);
