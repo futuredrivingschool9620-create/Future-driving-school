@@ -80,17 +80,67 @@ async function sendWhatsAppTemplate(
   const defaultLogoUrl = 'https://raw.githubusercontent.com/futuredrivingschool9620-create/Future-driving-school/main/client/public/logo.png';
   const headerImageUrl = process.env.WHATSAPP_HEADER_IMAGE_URL || defaultLogoUrl;
 
-  // Build candidate combinations of (templateName, lang) to be 100% resilient
+  // 1. Query Meta for WABA details and exact approved templates
+  let discoveredTemplateName = preferredTemplate;
+  let discoveredLang = process.env.WHATSAPP_TEMPLATE_LANG?.trim() || 'en';
+
+  try {
+    const phoneInfoRes = await fetch(`${apiUrl}/${phoneNumberId}?fields=verified_name,display_phone_number,whatsapp_business_account`, {
+      headers: { 'Authorization': `Bearer ${apiToken}` },
+    });
+    const phoneInfo = await phoneInfoRes.json() as any;
+    console.log(`[Meta Info] Phone ID ${phoneNumberId} details:`, JSON.stringify(phoneInfo));
+
+    const wabaId = phoneInfo?.whatsapp_business_account?.id;
+    if (wabaId) {
+      const tplRes = await fetch(`${apiUrl}/${wabaId}/message_templates?limit=100`, {
+        headers: { 'Authorization': `Bearer ${apiToken}` },
+      });
+      const tplData = await tplRes.json() as any;
+
+      if (tplData?.data && Array.isArray(tplData.data)) {
+        console.log(`[Meta Info] Approved/available templates in WABA ${wabaId}:`, JSON.stringify(tplData.data.map((t: any) => ({
+          name: t.name,
+          status: t.status,
+          language: t.language,
+        }))));
+
+        // Find matching approved template
+        const match = tplData.data.find((t: any) =>
+          (t.name.toLowerCase() === preferredTemplate.toLowerCase() ||
+           t.name.toLowerCase().includes('future') ||
+           t.name.toLowerCase().includes('insurance')) &&
+          (t.status === 'APPROVED' || t.status === 'ACTIVE' || t.status === 'QUALITY_PENDING')
+        ) || tplData.data.find((t: any) => t.status === 'APPROVED');
+
+        if (match) {
+          discoveredTemplateName = match.name;
+          discoveredLang = match.language;
+          console.log(`🎯 [Meta Info] Auto-discovered matching template: "${discoveredTemplateName}" with language code: "${discoveredLang}"`);
+        } else {
+          console.warn(`⚠️ [Meta Info] No matching template found in WABA ${wabaId}! Total templates found: ${tplData.data.length}`);
+        }
+      } else {
+        console.warn(`[Meta Info] Could not fetch templates from WABA ${wabaId}:`, JSON.stringify(tplData));
+      }
+    }
+  } catch (metaErr) {
+    console.warn(`[Meta Info] Discovery call skipped/failed:`, metaErr);
+  }
+
+  // 2. Candidate combinations: discovered match first, then fallbacks
   const templateNames = Array.from(new Set([
+    discoveredTemplateName,
     preferredTemplate,
     'future_driving_school',
     'insurance_renewal_reminder',
   ].filter(Boolean) as string[]));
 
   const languages = Array.from(new Set([
-    process.env.WHATSAPP_TEMPLATE_LANG?.trim(),
+    discoveredLang,
     'en',
     'en_US',
+    'en_GB',
   ].filter(Boolean) as string[]));
 
   const url = `${apiUrl}/${phoneNumberId}/messages`;
@@ -98,12 +148,11 @@ async function sendWhatsAppTemplate(
 
   for (const templateName of templateNames) {
     for (const lang of languages) {
-      // Try with image header first, and fallback to no header if Meta reports parameter mismatch
       const headerOptions = headerImageUrl ? [true, false] : [false];
 
       for (const includeHeader of headerOptions) {
         try {
-          console.log(`[WhatsApp] Calling API: ${url} (template="${templateName}", lang="${lang}", headerImage=${includeHeader})`);
+          console.log(`[WhatsApp] Sending: template="${templateName}", lang="${lang}", headerImage=${includeHeader}`);
 
           const components: any[] = [];
           if (includeHeader && headerImageUrl) {
@@ -159,9 +208,8 @@ async function sendWhatsAppTemplate(
           } catch {}
 
           lastError = `API error ${response.status} (Code ${errorCode}): ${errorMessage}`;
-          console.warn(`[WhatsApp] Candidate "${templateName}" [${lang}] failed: ${lastError}`);
 
-          // If error is NOT template/translation missing (132001) or parameter mismatch (132000), abort retries (e.g. auth error)
+          // If error is NOT template missing (132001) or parameter mismatch (132000), stop retrying
           if (errorCode !== 132001 && errorCode !== 132000) {
             console.error(`[WhatsApp] Fatal API error: ${lastError}`);
             return { success: false, error: lastError };
