@@ -54,54 +54,50 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     results.step2_phone_details = { error: e.message };
   }
 
-  // Step 3: If we got a WABA ID, fetch all templates
-  const wabaId = results.step2_phone_details?.whatsapp_business_account?.id;
-  if (wabaId) {
-    try {
-      const tplRes = await fetch(
-        `${apiUrl}/${wabaId}/message_templates?limit=100`,
-        { headers: { Authorization: `Bearer ${apiToken}` } }
+  // Step 3: Fetch templates from WABA
+  // Try auto-detected WABA ID first, fallback to known WABA ID from WhatsApp Manager URL
+  const wabaId = results.step2_phone_details?.whatsapp_business_account?.id || '1116030660847995';
+  results.step3_waba_id_used = wabaId;
+
+  try {
+    const tplRes = await fetch(
+      `${apiUrl}/${wabaId}/message_templates?limit=100`,
+      { headers: { Authorization: `Bearer ${apiToken}` } }
+    );
+    const tplData = await tplRes.json();
+
+    if (tplData?.data && Array.isArray(tplData.data)) {
+      results.step3_all_templates = tplData.data.map((t: any) => ({
+        name: t.name,
+        status: t.status,
+        language: t.language,
+        category: t.category,
+        id: t.id,
+      }));
+
+      // Step 4: Check if our target template exists
+      const match = tplData.data.find(
+        (t: any) => t.name === templateName
       );
-      const tplData = await tplRes.json();
-
-      if (tplData?.data && Array.isArray(tplData.data)) {
-        results.step3_all_templates = tplData.data.map((t: any) => ({
-          name: t.name,
-          status: t.status,
-          language: t.language,
-          category: t.category,
-          id: t.id,
-        }));
-
-        // Step 4: Check if our target template exists
-        const match = tplData.data.find(
-          (t: any) => t.name === templateName
-        );
-        results.step4_template_match = match
-          ? {
-              found: true,
-              name: match.name,
-              status: match.status,
-              language: match.language,
-              suggestion: `Use WHATSAPP_TEMPLATE_NAME="${match.name}" and WHATSAPP_TEMPLATE_LANG="${match.language}"`,
-            }
-          : {
-              found: false,
-              searched_for: templateName,
-              available_names: tplData.data.map((t: any) => t.name),
-              suggestion: 'The template name you configured does NOT exist in this WABA. Use one of the available_names above.',
-            };
-      } else {
-        results.step3_all_templates = tplData;
-      }
-    } catch (e: any) {
-      results.step3_all_templates = { error: e.message };
+      results.step4_template_match = match
+        ? {
+            found: true,
+            name: match.name,
+            status: match.status,
+            language: match.language,
+            suggestion: `Use WHATSAPP_TEMPLATE_NAME="${match.name}" and WHATSAPP_TEMPLATE_LANG="${match.language}"`,
+          }
+        : {
+            found: false,
+            searched_for: templateName,
+            available_names: tplData.data.map((t: any) => t.name),
+            suggestion: 'The template name you configured does NOT exist in this WABA. Use one of the available_names above.',
+          };
+    } else {
+      results.step3_all_templates = tplData;
     }
-  } else {
-    results.step3_all_templates = {
-      skipped: true,
-      reason: 'Could not determine WABA ID from phone number. Check step2 for errors.',
-    };
+  } catch (e: any) {
+    results.step3_all_templates = { error: e.message };
   }
 
   return res.status(200).json(results);
