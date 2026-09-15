@@ -80,52 +80,49 @@ async function sendWhatsAppTemplate(
   const defaultLogoUrl = 'https://raw.githubusercontent.com/futuredrivingschool9620-create/Future-driving-school/main/client/public/logo.png';
   const headerImageUrl = process.env.WHATSAPP_HEADER_IMAGE_URL || defaultLogoUrl;
 
-  // 1. Query Meta for WABA details and exact approved templates
+  // 1. Query Meta WABA for exact approved templates
   let discoveredTemplateName = preferredTemplate;
   let discoveredLang = process.env.WHATSAPP_TEMPLATE_LANG?.trim() || 'en';
 
+  // Known WABA ID from debug endpoint (the WABA that owns phone number 1337951776062823)
+  const wabaId = '1070350425583234';
+
   try {
-    const phoneInfoRes = await fetch(`${apiUrl}/${phoneNumberId}?fields=verified_name,display_phone_number,whatsapp_business_account`, {
+    const tplRes = await fetch(`${apiUrl}/${wabaId}/message_templates?limit=100`, {
       headers: { 'Authorization': `Bearer ${apiToken}` },
     });
-    const phoneInfo = await phoneInfoRes.json() as any;
-    console.log(`[Meta Info] Phone ID ${phoneNumberId} details:`, JSON.stringify(phoneInfo));
+    const tplData = await tplRes.json() as any;
 
-    const wabaId = phoneInfo?.whatsapp_business_account?.id;
-    if (wabaId) {
-      const tplRes = await fetch(`${apiUrl}/${wabaId}/message_templates?limit=100`, {
-        headers: { 'Authorization': `Bearer ${apiToken}` },
-      });
-      const tplData = await tplRes.json() as any;
+    if (tplData?.data && Array.isArray(tplData.data)) {
+      console.log(`[Meta Info] Templates in WABA ${wabaId}:`, JSON.stringify(tplData.data.map((t: any) => ({
+        name: t.name,
+        status: t.status,
+        language: t.language,
+      }))));
 
-      if (tplData?.data && Array.isArray(tplData.data)) {
-        console.log(`[Meta Info] Approved/available templates in WABA ${wabaId}:`, JSON.stringify(tplData.data.map((t: any) => ({
-          name: t.name,
-          status: t.status,
-          language: t.language,
-        }))));
+      // Find matching template
+      const match = tplData.data.find((t: any) =>
+        t.name.toLowerCase() === preferredTemplate.toLowerCase() &&
+        (t.status === 'APPROVED' || t.status === 'ACTIVE' || t.status === 'QUALITY_PENDING')
+      ) || tplData.data.find((t: any) =>
+        (t.name.toLowerCase().includes('future') || t.name.toLowerCase().includes('insurance')) &&
+        (t.status === 'APPROVED' || t.status === 'ACTIVE' || t.status === 'QUALITY_PENDING')
+      );
 
-        // Find matching approved template
-        const match = tplData.data.find((t: any) =>
-          (t.name.toLowerCase() === preferredTemplate.toLowerCase() ||
-           t.name.toLowerCase().includes('future') ||
-           t.name.toLowerCase().includes('insurance')) &&
-          (t.status === 'APPROVED' || t.status === 'ACTIVE' || t.status === 'QUALITY_PENDING')
-        ) || tplData.data.find((t: any) => t.status === 'APPROVED');
-
-        if (match) {
-          discoveredTemplateName = match.name;
-          discoveredLang = match.language;
-          console.log(`🎯 [Meta Info] Auto-discovered matching template: "${discoveredTemplateName}" with language code: "${discoveredLang}"`);
-        } else {
-          console.warn(`⚠️ [Meta Info] No matching template found in WABA ${wabaId}! Total templates found: ${tplData.data.length}`);
-        }
+      if (match) {
+        discoveredTemplateName = match.name;
+        discoveredLang = match.language;
+        console.log(`🎯 [Meta Info] Using template: "${discoveredTemplateName}" (lang: "${discoveredLang}")`);
       } else {
-        console.warn(`[Meta Info] Could not fetch templates from WABA ${wabaId}:`, JSON.stringify(tplData));
+        console.warn(`⚠️ [Meta Info] Template "${preferredTemplate}" NOT FOUND in WABA ${wabaId}!`);
+        console.warn(`⚠️ [Meta Info] Available templates:`, tplData.data.map((t: any) => t.name));
+        console.warn(`⚠️ ACTION NEEDED: Create template "${preferredTemplate}" in WhatsApp Manager for WABA ${wabaId}`);
       }
+    } else {
+      console.warn(`[Meta Info] Could not fetch templates:`, JSON.stringify(tplData));
     }
   } catch (metaErr) {
-    console.warn(`[Meta Info] Discovery call skipped/failed:`, metaErr);
+    console.warn(`[Meta Info] Template discovery failed:`, metaErr);
   }
 
   // 2. Candidate combinations: discovered match first, then fallbacks
