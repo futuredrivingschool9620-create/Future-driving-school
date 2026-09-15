@@ -65,9 +65,11 @@ async function sendWhatsAppTemplate(
   templateName: string,
   params: string[],
 ): Promise<SendResult> {
-  const apiUrl = process.env.WHATSAPP_API_URL;
-  const apiToken = process.env.WHATSAPP_API_TOKEN;
-  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const rawApiUrl = process.env.WHATSAPP_API_URL?.trim() || 'https://graph.facebook.com/v20.0';
+  const apiUrl = rawApiUrl.replace(/\/+$/, '');
+  const rawPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID?.trim() || '';
+  const phoneNumberId = rawPhoneId.replace(/^["']|["']$/g, '');
+  const apiToken = process.env.WHATSAPP_API_TOKEN?.trim().replace(/^["']|["']$/g, '');
   const enabled = process.env.WHATSAPP_ENABLED === 'true';
 
   if (!enabled || !apiToken || !phoneNumberId) {
@@ -77,6 +79,7 @@ async function sendWhatsAppTemplate(
 
   try {
     const url = `${apiUrl}/${phoneNumberId}/messages`;
+    console.log(`[WhatsApp] Calling API endpoint: ${url}`);
 
     const templateLang = process.env.WHATSAPP_TEMPLATE_LANG || 'en_US';
     const headerImageUrl = process.env.WHATSAPP_HEADER_IMAGE_URL;
@@ -122,8 +125,14 @@ async function sendWhatsAppTemplate(
 
     if (!response.ok) {
       const errorBody = await response.text();
-      console.error(`[WhatsApp] API error: ${response.status} ${errorBody}`);
-      return { success: false, error: `API error: ${response.status} - ${errorBody}` };
+      let errorDetail = errorBody;
+      try {
+        const json = JSON.parse(errorBody);
+        errorDetail = `Message: "${json.error?.message}", Type: "${json.error?.type}", Code: ${json.error?.code}, Subcode: ${json.error?.error_subcode || 'none'}`;
+      } catch {}
+      console.error(`[WhatsApp] API error ${response.status}: ${errorDetail}`);
+      console.error(`[WhatsApp] Raw API response: ${errorBody}`);
+      return { success: false, error: `API error ${response.status}: ${errorDetail}` };
     }
 
     const data = await response.json() as { messages?: Array<{ id: string }> };
