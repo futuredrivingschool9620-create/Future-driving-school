@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npx prisma generate --schema=server/prisma/schema.prisma && npm run build --workspace=client && npm run build --workspace=server",
+  "buildCommand": "npx prisma@^6.9.0 generate --schema=server/prisma/schema.prisma && npm run build --workspace=client",
   "outputDirectory": "client/dist",
   "functions": {
     "api/**/*.ts": {
