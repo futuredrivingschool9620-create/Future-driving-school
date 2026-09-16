@@ -60,11 +60,16 @@ interface SendResult {
   error?: string;
 }
 
-async function sendWhatsAppTemplate(
-  phoneNumber: string,
-  preferredTemplate: string,
-  params: string[],
-): Promise<SendResult> {
+interface TemplateConfig {
+  status: 'APPROVED' | 'PENDING' | 'NOT_CONFIGURED';
+  templateName: string;
+  language: string;
+  notice?: string;
+}
+
+const WABA_ID = '1070350425583234';
+
+async function getWhatsAppTemplateConfig(preferredTemplate: string): Promise<TemplateConfig> {
   const rawApiUrl = process.env.WHATSAPP_API_URL?.trim() || 'https://graph.facebook.com/v25.0';
   const apiUrl = rawApiUrl.replace(/\/+$/, '');
   const rawPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID?.trim() || '';
@@ -73,154 +78,150 @@ async function sendWhatsAppTemplate(
   const enabled = process.env.WHATSAPP_ENABLED === 'true';
 
   if (!enabled || !apiToken || !phoneNumberId) {
-    console.log(`[WhatsApp] Not configured. Would send template "${preferredTemplate}" to ${phoneNumber}`);
-    return { success: false, error: 'WhatsApp not configured' };
+    return {
+      status: 'NOT_CONFIGURED',
+      templateName: preferredTemplate,
+      language: 'en',
+      notice: 'WhatsApp is not enabled or credentials are missing.',
+    };
   }
 
-  const defaultLogoUrl = 'https://raw.githubusercontent.com/futuredrivingschool9620-create/Future-driving-school/main/client/public/logo.png';
-  const headerImageUrl = process.env.WHATSAPP_HEADER_IMAGE_URL || defaultLogoUrl;
-
-  // 1. Query Meta WABA for exact approved templates
-  let discoveredTemplateName = preferredTemplate;
-  let discoveredLang = process.env.WHATSAPP_TEMPLATE_LANG?.trim() || 'en';
-
-  // Known WABA ID from debug endpoint (the WABA that owns phone number 1337951776062823)
-  const wabaId = '1070350425583234';
-
   try {
-    const tplRes = await fetch(`${apiUrl}/${wabaId}/message_templates?limit=100`, {
+    const res = await fetch(`${apiUrl}/${WABA_ID}/message_templates?limit=50`, {
       headers: { 'Authorization': `Bearer ${apiToken}` },
     });
-    const tplData = await tplRes.json() as any;
+    const data = await res.json() as any;
 
-    if (tplData?.data && Array.isArray(tplData.data)) {
-      console.log(`[Meta Info] Templates in WABA ${wabaId}:`, JSON.stringify(tplData.data.map((t: any) => ({
+    if (data?.data && Array.isArray(data.data)) {
+      const templates = data.data;
+      console.log(`[Meta Info] Templates in WABA ${WABA_ID}:`, JSON.stringify(templates.map((t: any) => ({
         name: t.name,
         status: t.status,
         language: t.language,
       }))));
 
-      // Find matching template
-      const match = tplData.data.find((t: any) =>
-        t.name.toLowerCase() === preferredTemplate.toLowerCase() &&
-        (t.status === 'APPROVED' || t.status === 'ACTIVE' || t.status === 'QUALITY_PENDING')
-      ) || tplData.data.find((t: any) =>
-        (t.name.toLowerCase().includes('future') || t.name.toLowerCase().includes('insurance')) &&
-        (t.status === 'APPROVED' || t.status === 'ACTIVE' || t.status === 'QUALITY_PENDING')
+      // 1. Check for APPROVED or ACTIVE template
+      const isApproved = (s: string) => s === 'APPROVED' || s === 'ACTIVE';
+      const approvedMatch = templates.find((t: any) =>
+        isApproved(t.status) && (
+          t.name.toLowerCase() === preferredTemplate.toLowerCase() ||
+          t.name.toLowerCase().includes('insurance') ||
+          t.name.toLowerCase().includes('vehicle') ||
+          t.name.toLowerCase().includes('future')
+        )
       );
 
-      if (match) {
-        discoveredTemplateName = match.name;
-        discoveredLang = match.language;
-        console.log(`🎯 [Meta Info] Using template: "${discoveredTemplateName}" (lang: "${discoveredLang}")`);
-      } else {
-        console.warn(`⚠️ [Meta Info] Template "${preferredTemplate}" NOT FOUND in WABA ${wabaId}!`);
-        console.warn(`⚠️ [Meta Info] Available templates:`, tplData.data.map((t: any) => t.name));
-        console.warn(`⚠️ ACTION NEEDED: Create template "${preferredTemplate}" in WhatsApp Manager for WABA ${wabaId}`);
+      if (approvedMatch) {
+        return {
+          status: 'APPROVED',
+          templateName: approvedMatch.name,
+          language: approvedMatch.language || 'en',
+        };
       }
+
+      // 2. Check for PENDING template
+      const pendingMatch = templates.find((t: any) =>
+        t.status === 'PENDING' && (
+          t.name.toLowerCase() === preferredTemplate.toLowerCase() ||
+          t.name.toLowerCase().includes('insurance') ||
+          t.name.toLowerCase().includes('vehicle') ||
+          t.name.toLowerCase().includes('future')
+        )
+      );
+
+      if (pendingMatch) {
+        return {
+          status: 'PENDING',
+          templateName: pendingMatch.name,
+          language: pendingMatch.language || 'en',
+          notice: `WhatsApp template "${pendingMatch.name}" is currently PENDING Meta approval. Messages will automatically send once Meta approves it.`,
+        };
+      }
+
+      return {
+        status: 'PENDING',
+        templateName: preferredTemplate,
+        language: 'en',
+        notice: `No matching template found in WABA ${WABA_ID}. Please create and approve a template in Meta WhatsApp Manager.`,
+      };
     } else {
-      console.warn(`[Meta Info] Could not fetch templates:`, JSON.stringify(tplData));
+      console.warn(`[Meta Info] Could not fetch templates:`, JSON.stringify(data));
     }
-  } catch (metaErr) {
-    console.warn(`[Meta Info] Template discovery failed:`, metaErr);
+  } catch (err) {
+    console.warn(`[Meta Info] Template discovery failed:`, err);
   }
 
-  // 2. Candidate combinations: discovered match first, then fallbacks
-  const templateNames = Array.from(new Set([
-    discoveredTemplateName,
-    preferredTemplate,
-    'future_driving_school',
-    'insurance_renewal_reminder',
-  ].filter(Boolean) as string[]));
+  return {
+    status: 'APPROVED',
+    templateName: preferredTemplate,
+    language: process.env.WHATSAPP_TEMPLATE_LANG?.trim() || 'en',
+  };
+}
 
-  const languages = Array.from(new Set([
-    discoveredLang,
-    'en',
-    'en_US',
-    'en_GB',
-  ].filter(Boolean) as string[]));
+async function sendWhatsAppTemplateMessage(
+  phoneNumber: string,
+  templateName: string,
+  language: string,
+  params: string[],
+): Promise<SendResult> {
+  const rawApiUrl = process.env.WHATSAPP_API_URL?.trim() || 'https://graph.facebook.com/v25.0';
+  const apiUrl = rawApiUrl.replace(/\/+$/, '');
+  const rawPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID?.trim() || '';
+  const phoneNumberId = rawPhoneId.replace(/^["']|["']$/g, '');
+  const apiToken = process.env.WHATSAPP_API_TOKEN?.trim().replace(/^["']|["']$/g, '');
 
   const url = `${apiUrl}/${phoneNumberId}/messages`;
-  let lastError = '';
 
-  for (const templateName of templateNames) {
-    for (const lang of languages) {
-      const headerOptions = headerImageUrl ? [true, false] : [false];
+  try {
+    const components = [
+      {
+        type: 'body',
+        parameters: params.map((p) => ({ type: 'text', text: p })),
+      },
+    ];
 
-      for (const includeHeader of headerOptions) {
-        try {
-          console.log(`[WhatsApp] Sending: template="${templateName}", lang="${lang}", headerImage=${includeHeader}`);
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        to: phoneNumber.replace(/[^0-9]/g, ''),
+        type: 'template',
+        template: {
+          name: templateName,
+          language: { code: language },
+          components,
+        },
+      }),
+    });
 
-          const components: any[] = [];
-          if (includeHeader && headerImageUrl) {
-            components.push({
-              type: 'header',
-              parameters: [
-                {
-                  type: 'image',
-                  image: { link: headerImageUrl },
-                },
-              ],
-            });
-          }
-
-          // Body parameters: {{1}}, {{2}}, {{3}}, {{4}}, {{5}}
-          components.push({
-            type: 'body',
-            parameters: params.map((p) => ({ type: 'text', text: p })),
-          });
-
-          const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${apiToken}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              messaging_product: 'whatsapp',
-              to: phoneNumber.replace(/[^0-9]/g, ''),
-              type: 'template',
-              template: {
-                name: templateName,
-                language: { code: lang },
-                components,
-              },
-            }),
-          });
-
-          if (response.ok) {
-            const data = await response.json() as { messages?: Array<{ id: string }> };
-            const messageId = data.messages?.[0]?.id;
-            console.log(`✅ [WhatsApp] Success! Template "${templateName}" (${lang}) sent to ${phoneNumber}. Message ID: ${messageId}`);
-            return { success: true, messageId };
-          }
-
-          const errorBody = await response.text();
-          let errorCode = 0;
-          let errorMessage = errorBody;
-          try {
-            const json = JSON.parse(errorBody);
-            errorCode = json.error?.code || 0;
-            errorMessage = json.error?.message || errorBody;
-          } catch {}
-
-          lastError = `API error ${response.status} (Code ${errorCode}): ${errorMessage}`;
-
-          // If error is NOT template missing (132001) or parameter mismatch (132000), stop retrying
-          if (errorCode !== 132001 && errorCode !== 132000) {
-            console.error(`[WhatsApp] Fatal API error: ${lastError}`);
-            return { success: false, error: lastError };
-          }
-        } catch (error) {
-          const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-          console.error(`[WhatsApp] Send exception: ${errorMsg}`);
-          return { success: false, error: errorMsg };
-        }
-      }
+    if (response.ok) {
+      const data = await response.json() as { messages?: Array<{ id: string }> };
+      const messageId = data.messages?.[0]?.id;
+      console.log(`✅ [WhatsApp] Success! Template "${templateName}" (${language}) sent to ${phoneNumber}. Message ID: ${messageId}`);
+      return { success: true, messageId };
     }
-  }
 
-  return { success: false, error: lastError || 'Failed to send template with all candidate options' };
+    const errorBody = await response.text();
+    let errorCode = 0;
+    let errorMessage = errorBody;
+    try {
+      const json = JSON.parse(errorBody);
+      errorCode = json.error?.code || 0;
+      errorMessage = json.error?.message || errorBody;
+    } catch {}
+
+    const lastError = `API error ${response.status} (Code ${errorCode}): ${errorMessage}`;
+    console.error(`[WhatsApp] Send error: ${lastError}`);
+    return { success: false, error: lastError };
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+    console.error(`[WhatsApp] Send exception: ${errorMsg}`);
+    return { success: false, error: errorMsg };
+  }
 }
 
 // ── Main Handler ─────────────────────────────────────────────────────────────
@@ -245,6 +246,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const today = getTodayIST();
     const templateName = process.env.WHATSAPP_TEMPLATE_NAME || 'future_driving_school';
+
+    // Discover WhatsApp template once before processing documents
+    const templateConfig = await getWhatsAppTemplateConfig(templateName);
+    if (templateConfig.status === 'APPROVED') {
+      console.log(`🎯 [Meta Info] Using approved template "${templateConfig.templateName}" (lang: "${templateConfig.language}")`);
+    } else {
+      console.warn(`⚠️ [Meta Info] ${templateConfig.notice}`);
+    }
 
     // 2. Query: All active, current Insurance documents linked to a vehicle
     const documents = await prisma.document.findMany({
@@ -383,7 +392,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           daysStr,
         ];
 
-        const result = await sendWhatsAppTemplate(phoneNumber, templateName, templateParams);
+        let result: SendResult;
+
+        if (templateConfig.status === 'PENDING') {
+          // Template is pending Meta review; don't hit Meta API which returns 132001
+          result = { success: false, error: templateConfig.notice };
+        } else if (templateConfig.status === 'NOT_CONFIGURED') {
+          result = { success: false, error: 'WhatsApp not configured' };
+        } else {
+          result = await sendWhatsAppTemplateMessage(
+            phoneNumber,
+            templateConfig.templateName,
+            templateConfig.language,
+            templateParams,
+          );
+        }
 
         if (result.success) {
           const now = new Date();
@@ -400,16 +423,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           notificationsSent++;
           console.log(`  ✅ Sent  : ${customerName} | ${vehicleNumber} | ${reminderTypeStr} | id:${result.messageId}`);
         } else {
+          const isPending = templateConfig.status === 'PENDING';
           await prisma.notification.update({
             where: { id: notification.id },
             data: {
-              notificationStatus: 'FAILED',
-              deliveryStatus:     'FAILED',
+              notificationStatus: isPending ? 'PENDING' : 'FAILED',
+              deliveryStatus:     isPending ? 'QUEUED' : 'FAILED',
               cancellationReason: result.error,
             },
           });
-          errors.push(`${customerName} (${vehicleNumber}): ${result.error}`);
-          console.error(`  ❌ Failed: ${customerName} | ${vehicleNumber} | ${result.error}`);
+          if (isPending) {
+            console.log(`  ⏳ Queued (Awaiting Template Approval): ${customerName} | ${vehicleNumber}`);
+          } else {
+            errors.push(`${customerName} (${vehicleNumber}): ${result.error}`);
+            console.error(`  ❌ Failed: ${customerName} | ${vehicleNumber} | ${result.error}`);
+          }
         }
       } catch (sendErr) {
         const errMsg = sendErr instanceof Error ? sendErr.message : 'Unknown send error';
@@ -436,6 +464,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       notificationsCreated,
       notificationsSent,
       skipped,
+      whatsappStatus:         templateConfig.status,
+      ...(templateConfig.notice && { whatsappNotice: templateConfig.notice }),
       ...(errors.length > 0 && { errors }),
     };
 
