@@ -325,11 +325,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // 5. Build plain-text message (stored in DB / SMS fallback)
       const daysStr =
-        daysRemaining === 0 ? '0 (TODAY)'
-        : daysRemaining === 1 ? '1 (TOMORROW)'
-        : `${daysRemaining}`;
+        daysRemaining === 0 ? '0 days (TODAY)'
+        : daysRemaining === 1 ? '1 day (TOMORROW)'
+        : `${daysRemaining} days`;
 
-      const message = buildMessage(customerName, vehicleNumber, formatDateIN(doc.endDate), daysStr + ' days');
+      const message = buildMessage(customerName, vehicleNumber, formatDateIN(doc.endDate), daysStr);
 
       // 6. Persist or reuse Notification record (PENDING)
       let notification;
