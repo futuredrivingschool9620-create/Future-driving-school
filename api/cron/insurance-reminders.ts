@@ -275,10 +275,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.warn(`⚠️ [Meta Info] ${templateConfig.notice}`);
     }
 
-    // 2. Query: All active, current Insurance documents linked to a vehicle
+    // 2. Query: All active, current documents linked to a vehicle (Insurance, Fitness, Tax, Custom docs)
     const documents = await prisma.document.findMany({
       where: {
-        documentName: 'Insurance',
         isActive: true,
         isCurrent: true,
         vehicleId: { not: null },
@@ -349,7 +348,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         : daysRemaining === 1 ? '1 day (TOMORROW)'
         : `${daysRemaining} days`;
 
-      const message = buildMessage(customerName, vehicleNumber, formatDateIN(doc.endDate), daysStr);
+      const message = buildMessage(customerName, vehicleNumber, doc.documentName || 'Document', formatDateIN(doc.endDate), daysStr);
 
       // 6. Persist or reuse Notification record (PENDING)
       let notification;
@@ -407,7 +406,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const templateParams = [
           customerName,
           vehicleNumber,
-          doc.documentName || 'Insurance',
+          doc.documentName || 'Document',
           formatDateIN(doc.endDate),
           daysStr,
         ];
@@ -506,18 +505,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 function buildMessage(
   customerName: string,
   vehicleNumber: string,
+  documentName: string,
   expiryDate: string,
   daysStr: string,
 ): string {
   return `MD MUBARAK (RTO 55)
 
-Future Driving School – Insurance Renewal Reminder
+Future Driving School – ${documentName} Renewal Reminder
 
 Dear ${customerName},
 
 This is a reminder regarding your vehicle ${vehicleNumber}.
 
-📄 DOCUMENT: Insurance
+📄 DOCUMENT: ${documentName}
 📅 EXPIRY DATE: ${expiryDate}
 ⚠️  DAYS REMAINING: ${daysStr}
 
