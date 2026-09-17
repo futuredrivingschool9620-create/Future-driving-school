@@ -64,6 +64,7 @@ interface TemplateConfig {
   status: 'APPROVED' | 'PENDING' | 'NOT_CONFIGURED';
   templateName: string;
   language: string;
+  hasImageHeader?: boolean;
   notice?: string;
 }
 
@@ -112,10 +113,12 @@ async function getWhatsAppTemplateConfig(preferredTemplate: string): Promise<Tem
       );
 
       if (approvedMatch) {
+        const hasImageHeader = approvedMatch.components?.some((c: any) => c.type === 'HEADER' && c.format === 'IMAGE');
         return {
           status: 'APPROVED',
           templateName: approvedMatch.name,
           language: approvedMatch.language || 'en',
+          hasImageHeader,
         };
       }
 
@@ -130,10 +133,12 @@ async function getWhatsAppTemplateConfig(preferredTemplate: string): Promise<Tem
       );
 
       if (pendingMatch) {
+        const hasImageHeader = pendingMatch.components?.some((c: any) => c.type === 'HEADER' && c.format === 'IMAGE');
         return {
           status: 'PENDING',
           templateName: pendingMatch.name,
           language: pendingMatch.language || 'en',
+          hasImageHeader,
           notice: `WhatsApp template "${pendingMatch.name}" is currently PENDING Meta approval. Messages will automatically send once Meta approves it.`,
         };
       }
@@ -163,6 +168,7 @@ async function sendWhatsAppTemplateMessage(
   templateName: string,
   language: string,
   params: string[],
+  hasImageHeader: boolean = false,
 ): Promise<SendResult> {
   const rawApiUrl = process.env.WHATSAPP_API_URL?.trim() || 'https://graph.facebook.com/v25.0';
   const apiUrl = rawApiUrl.replace(/\/+$/, '');
@@ -173,12 +179,26 @@ async function sendWhatsAppTemplateMessage(
   const url = `${apiUrl}/${phoneNumberId}/messages`;
 
   try {
-    const components = [
-      {
-        type: 'body',
-        parameters: params.map((p) => ({ type: 'text', text: p })),
-      },
-    ];
+    const components: any[] = [];
+
+    if (hasImageHeader) {
+      const defaultLogoUrl = 'https://raw.githubusercontent.com/futuredrivingschool9620-create/Future-driving-school/main/client/public/logo.png';
+      const headerImageUrl = process.env.WHATSAPP_HEADER_IMAGE_URL || defaultLogoUrl;
+      components.push({
+        type: 'header',
+        parameters: [
+          {
+            type: 'image',
+            image: { link: headerImageUrl },
+          },
+        ],
+      });
+    }
+
+    components.push({
+      type: 'body',
+      parameters: params.map((p) => ({ type: 'text', text: p })),
+    });
 
     const response = await fetch(url, {
       method: 'POST',
@@ -405,6 +425,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             templateConfig.templateName,
             templateConfig.language,
             templateParams,
+            templateConfig.hasImageHeader,
           );
         }
 

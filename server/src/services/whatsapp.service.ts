@@ -65,7 +65,8 @@ export class WhatsAppService {
   static async sendTemplate(
     phoneNumber: string,
     templateName: string,
-    params: string[]
+    params: string[],
+    hasImageHeader: boolean = true,
   ): Promise<SendResult> {
     if (!env.WHATSAPP_ENABLED || !env.WHATSAPP_API_TOKEN || !env.WHATSAPP_PHONE_NUMBER_ID) {
       console.log(`[WhatsApp] Not configured. Would send template "${templateName}" to ${phoneNumber}`);
@@ -74,6 +75,20 @@ export class WhatsAppService {
 
     try {
       const url = `${env.WHATSAPP_API_URL}/${env.WHATSAPP_PHONE_NUMBER_ID}/messages`;
+
+      const components: any[] = [];
+      if (hasImageHeader) {
+        const logoUrl = 'https://raw.githubusercontent.com/futuredrivingschool9620-create/Future-driving-school/main/client/public/logo.png';
+        components.push({
+          type: 'header',
+          parameters: [{ type: 'image', image: { link: logoUrl } }],
+        });
+      }
+
+      components.push({
+        type: 'body',
+        parameters: params.map((p) => ({ type: 'text', text: p })),
+      });
 
       const response = await fetch(url, {
         method: 'POST',
@@ -88,12 +103,7 @@ export class WhatsAppService {
           template: {
             name: templateName,
             language: { code: 'en' },
-            components: [
-              {
-                type: 'body',
-                parameters: params.map((p) => ({ type: 'text', text: p })),
-              },
-            ],
+            components,
           },
         }),
       });
