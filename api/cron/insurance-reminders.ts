@@ -40,7 +40,7 @@ function getReminderType(daysRemaining: number): string | null {
   if (daysRemaining === 3) return 'SEVEN_DAY_3';
   if (daysRemaining === 2) return 'SEVEN_DAY_2';
   if (daysRemaining === 1) return 'SEVEN_DAY_1';
-  if (daysRemaining === 0) return 'EXPIRY_DAY';
+  if (daysRemaining <= 0 && daysRemaining >= -30) return 'EXPIRY_DAY';
   return null;
 }
 
@@ -346,7 +346,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const daysStr =
         daysRemaining === 0 ? '0 days (TODAY)'
         : daysRemaining === 1 ? '1 day (TOMORROW)'
-        : `${daysRemaining} days`;
+        : daysRemaining > 1 ? `${daysRemaining} days`
+        : `EXPIRED (${Math.abs(daysRemaining)} days ago)`;
 
       const message = buildMessage(customerName, vehicleNumber, doc.documentName || 'Document', formatDateIN(doc.endDate), daysStr);
 
@@ -433,7 +434,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           await prisma.notification.update({
             where: { id: notification.id },
             data: {
-              notificationStatus: 'SENT',
+              notificationStatus: 'SENT',   
               deliveryStatus:     'SENT',
               sentDate:           now,
               sentTime:           now.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' }),
