@@ -2,6 +2,7 @@ import { useState, useEffect, type FormEvent } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { authApi, dashboardApi, appApi } from '../../lib/api';
 import type { AppVersionInfo } from '../../types';
+import { CURRENT_APP_VERSION } from '../../config/version';
 
 export default function SettingsPage() {
   const { logout, admin } = useAuth();
@@ -19,7 +20,7 @@ export default function SettingsPage() {
   const [triggerMsg, setTriggerMsg] = useState('');
 
   // App Version & Update State
-  const clientVersion = window.electronAPI?.appVersion || '1.2.0';
+  const clientVersion = window.electronAPI?.appVersion || CURRENT_APP_VERSION;
   const [versionInfo, setVersionInfo] = useState<AppVersionInfo | null>(null);
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
   const [updateMsg, setUpdateMsg] = useState('');

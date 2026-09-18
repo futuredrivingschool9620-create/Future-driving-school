@@ -6,6 +6,7 @@ import { appApi } from '../../lib/api';
 import type { AppVersionInfo } from '../../types';
 import { UpdateBanner } from '../shared/UpdateBanner';
 import { UpdateModal } from '../shared/UpdateModal';
+import { CURRENT_APP_VERSION } from '../../config/version';
 
 const navItems = [
   {
@@ -97,7 +98,7 @@ export default function AuthenticatedLayout() {
     let isMounted = true;
     const checkVersion = async () => {
       try {
-        const clientVer = window.electronAPI?.appVersion || '1.2.0';
+        const clientVer = window.electronAPI?.appVersion || CURRENT_APP_VERSION;
         const info = await appApi.getVersionInfo(clientVer);
         if (!isMounted) return;
 

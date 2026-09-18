@@ -109,7 +109,7 @@ export class UpdateService {
       }
     }
 
-    const currentVer = clientVersion || '1.2.0';
+    const currentVer = clientVersion || currentUpdateInfo.latestVersion;
     const hasUpdate = this.compareVersions(currentUpdateInfo.latestVersion, currentVer) > 0;
 
     return {
