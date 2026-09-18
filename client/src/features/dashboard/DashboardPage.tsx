@@ -116,7 +116,7 @@ export default function DashboardPage() {
         applyFilters();
       }
     } catch (err: any) {
-      const errMsg = err?.response?.data?.message || err?.message || 'Failed to run expiry check';
+      const errMsg = err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Failed to run expiry check';
       setAlertNotice({ type: 'error', message: errMsg });
     } finally {
       setIsRunningExpiryCheck(false);
@@ -136,7 +136,7 @@ export default function DashboardPage() {
         applyFilters();
       }
     } catch (err: any) {
-      const errMsg = err?.response?.data?.message || err?.message || 'Failed to send WhatsApp message';
+      const errMsg = err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Failed to send WhatsApp message';
       setAlertNotice({ type: 'error', message: errMsg });
     } finally {
       setSendingDocId(null);

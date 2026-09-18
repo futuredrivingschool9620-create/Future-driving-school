@@ -94,7 +94,7 @@ export class SchedulerService {
 
     for (const doc of documents) {
       // Skip if customer is inactive or vehicle is inactive
-      if (!doc.customer.isActive || (doc.vehicle && !doc.vehicle.isActive)) {
+      if (!doc.customer || !doc.customer.isActive || (doc.vehicle && !doc.vehicle.isActive)) {
         skipped++;
         continue;
       }
@@ -107,7 +107,7 @@ export class SchedulerService {
         continue;
       }
 
-      const customerName = `${doc.customer.firstName} ${doc.customer.secondName}`;
+      const customerName = `${doc.customer.firstName} ${doc.customer.secondName || ''}`.trim();
       const targetVehicleNumber = doc.vehicle?.vehicleNumber || doc.customer.vehicleNumber || 'Vehicle';
 
       // Check for duplicate notification

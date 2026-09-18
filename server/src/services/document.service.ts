@@ -505,30 +505,60 @@ export class DocumentService {
     }
 
     const today = getTodayIST();
-    const reminderTypeStr = getReminderType(daysRemaining) || 'MANUAL';
+    const reminderTypeStr = (getReminderType(daysRemaining) || 'MANUAL') as any;
     const message = `Future Driving School reminder for ${document.documentName} (${vehicleNumber})`;
+    const now = new Date();
+    const sentTime = now.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' });
 
-    await prisma.notification.create({
-      data: {
-        customerId: document.customerId,
-        vehicleId: document.vehicleId || null,
-        documentId: document.id,
-        customerName,
-        phoneNumber,
-        vehicleNumber,
-        documentType: document.documentName,
-        originalExpiryDate: document.endDate,
-        currentExpiryDate: document.endDate,
-        reminderType: reminderTypeStr as any,
-        message,
-        calendarDay: today,
-        notificationStatus: 'SENT',
-        deliveryStatus: 'SENT',
-        sentDate: new Date(),
-        sentTime: new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' }),
-        providerMessageId: result.messageId,
-      },
-    });
+    try {
+      const existing = await prisma.notification.findFirst({
+        where: {
+          customerId: document.customerId,
+          documentId: document.id,
+          reminderType: reminderTypeStr,
+          currentExpiryDate: document.endDate,
+          calendarDay: today,
+        },
+      });
+
+      if (existing) {
+        await prisma.notification.update({
+          where: { id: existing.id },
+          data: {
+            notificationStatus: 'SENT',
+            deliveryStatus:     'SENT',
+            sentDate:           now,
+            sentTime,
+            providerMessageId:  result.messageId,
+            message,
+          },
+        });
+      } else {
+        await prisma.notification.create({
+          data: {
+            customerId:         document.customerId,
+            vehicleId:          document.vehicleId || null,
+            documentId:         document.id,
+            customerName,
+            phoneNumber,
+            vehicleNumber,
+            documentType:       document.documentName,
+            originalExpiryDate: document.endDate,
+            currentExpiryDate:  document.endDate,
+            reminderType:       reminderTypeStr,
+            message,
+            calendarDay:        today,
+            notificationStatus: 'SENT',
+            deliveryStatus:     'SENT',
+            sentDate:           now,
+            sentTime,
+            providerMessageId:  result.messageId,
+          },
+        });
+      }
+    } catch (dbErr) {
+      console.warn('[sendReminder] DB Notification record update/create non-fatal error:', dbErr);
+    }
 
     // Auto-update vehicle status to Expired if document is expired
     if (daysRemaining <= 0 && document.vehicleId) {
@@ -537,19 +567,29 @@ export class DocumentService {
           where: { id: document.vehicleId },
           data: { status: 'Expired', updatedByAdminId: adminId },
         });
-      } catch {}
+      } catch (vehErr) {
+        console.warn('[sendReminder] Could not update vehicle status:', vehErr);
+      }
     }
 
-    await AuditService.log({
-      adminId,
-      entityType: 'Document',
-      entityId: id,
-      action: 'UPDATE',
-      newData: { manualReminderSent: true, messageId: result.messageId, to: phoneNumber },
-      ipAddress,
-    });
+    try {
+      await AuditService.log({
+        adminId,
+        entityType: 'Document',
+        entityId: id,
+        action: 'UPDATE',
+        newData: { manualReminderSent: true, messageId: result.messageId, to: phoneNumber },
+        ipAddress,
+      });
+    } catch (auditErr) {
+      console.warn('[sendReminder] Audit log error:', auditErr);
+    }
 
-    SSEService.broadcast({ type: 'DOCUMENT_UPDATE', data: { documentId: id, customerId: document.customerId } });
+    try {
+      SSEService.broadcast({ type: 'DOCUMENT_UPDATE', data: { documentId: id, customerId: document.customerId } });
+    } catch (sseErr) {
+      console.warn('[sendReminder] SSE broadcast error:', sseErr);
+    }
 
     return {
       success: true,

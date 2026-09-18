@@ -123,7 +123,7 @@ export default function DocumentsPage() {
       setAlertNotice({ type: 'success', message: sentMsg });
       fetchDocuments();
     } catch (err: any) {
-      const errMsg = err?.response?.data?.message || err?.message || 'Failed to run expiry check';
+      const errMsg = err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Failed to run expiry check';
       setAlertNotice({ type: 'error', message: errMsg });
     } finally {
       setIsRunningExpiryCheck(false);
@@ -141,7 +141,7 @@ export default function DocumentsPage() {
       });
       fetchDocuments();
     } catch (err: any) {
-      const errMsg = err?.response?.data?.message || err?.message || 'Failed to send WhatsApp message';
+      const errMsg = err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Failed to send WhatsApp message';
       setAlertNotice({ type: 'error', message: errMsg });
     } finally {
       setSendingDocId(null);
