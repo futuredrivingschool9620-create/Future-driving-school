@@ -1,7 +1,11 @@
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import logoImg from '../../preset/WhatsApp.jpeg';
+import { appApi } from '../../lib/api';
+import type { AppVersionInfo } from '../../types';
+import { UpdateBanner } from '../shared/UpdateBanner';
+import { UpdateModal } from '../shared/UpdateModal';
 
 const navItems = [
   {
@@ -83,6 +87,63 @@ export default function AuthenticatedLayout() {
   const { admin } = useAuth();
   const location = useLocation();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // App Update State
+  const [updateInfo, setUpdateInfo] = useState<AppVersionInfo | null>(null);
+  const [showBanner, setShowBanner] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    const checkVersion = async () => {
+      try {
+        const clientVer = window.electronAPI?.appVersion || '1.2.0';
+        const info = await appApi.getVersionInfo(clientVer);
+        if (!isMounted) return;
+
+        setUpdateInfo(info);
+
+        if (info.hasUpdate) {
+          const dismissedVer = localStorage.getItem('dismissed_update_version');
+          const dismissedTime = localStorage.getItem('dismissed_update_time');
+          const isDismissedRecently =
+            dismissedVer === info.latestVersion &&
+            dismissedTime &&
+            Date.now() - parseInt(dismissedTime, 10) < 24 * 60 * 60 * 1000;
+
+          if (!isDismissedRecently || info.mandatory) {
+            setShowBanner(true);
+          }
+        }
+      } catch {
+        // Non-fatal
+      }
+    };
+
+    checkVersion();
+    const interval = setInterval(checkVersion, 6 * 60 * 60 * 1000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  const handleDownloadUpdate = () => {
+    if (!updateInfo?.downloadUrl) return;
+    if (window.electronAPI?.openExternalUrl) {
+      window.electronAPI.openExternalUrl(updateInfo.downloadUrl);
+    } else {
+      window.open(updateInfo.downloadUrl, '_blank');
+    }
+  };
+
+  const handleDismissBanner = () => {
+    if (updateInfo) {
+      localStorage.setItem('dismissed_update_version', updateInfo.latestVersion);
+      localStorage.setItem('dismissed_update_time', Date.now().toString());
+    }
+    setShowBanner(false);
+  };
 
   const getPageTitle = () => {
     if (location.pathname.startsWith('/customers')) {
@@ -212,13 +273,46 @@ export default function AuthenticatedLayout() {
                 })}
               </p>
             </div>
+            <div className="flex items-center gap-3">
+              {updateInfo?.hasUpdate && (
+                <button
+                  onClick={() => setShowModal(true)}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold bg-teal-500/15 text-teal-300 border border-teal-500/30 hover:bg-teal-500/25 transition-all shadow-sm cursor-pointer"
+                  title="Click to view update details"
+                >
+                  <span className="flex h-2 w-2 relative">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-teal-500"></span>
+                  </span>
+                  <span>Update v{updateInfo.latestVersion} Available</span>
+                </button>
+              )}
+            </div>
           </div>
         </header>
+
+        {/* In-App Update Announcement Banner */}
+        {showBanner && (
+          <UpdateBanner
+            updateInfo={updateInfo}
+            onOpenDetails={() => setShowModal(true)}
+            onDownload={handleDownloadUpdate}
+            onDismiss={handleDismissBanner}
+          />
+        )}
 
         {/* Page Content */}
         <div className="p-4 md:p-8 page-enter">
           <Outlet />
         </div>
+
+        {/* What's New / Update Modal */}
+        <UpdateModal
+          isOpen={showModal}
+          onClose={() => setShowModal(false)}
+          updateInfo={updateInfo}
+          onDownload={handleDownloadUpdate}
+        />
       </main>
     </div>
   );

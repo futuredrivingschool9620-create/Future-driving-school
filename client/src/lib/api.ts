@@ -23,6 +23,7 @@ import type {
   UploadedPdfRecord,
   Vehicle,
   VehicleItemInput,
+  AppVersionInfo,
 } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
@@ -365,4 +366,21 @@ export const dashboardApi = {
   },
 };
 
+// ── App Version & Updates API ──
+
+export const appApi = {
+  getVersionInfo: async (clientVersion?: string): Promise<AppVersionInfo> => {
+    const { data } = await api.get<AppVersionInfo>('/app/version', {
+      params: clientVersion ? { clientVersion } : undefined,
+    });
+    return data;
+  },
+
+  updateVersionInfo: async (payload: Partial<AppVersionInfo>): Promise<{ message: string; info: AppVersionInfo }> => {
+    const { data } = await api.post<{ message: string; info: AppVersionInfo }>('/app/version', payload);
+    return data;
+  },
+};
+
 export default api;
+

@@ -167,6 +167,16 @@ ipcMain.on('window-close', () => {
   if (mainWindow) mainWindow.close();
 });
 
+ipcMain.handle('get-app-version', () => {
+  return app.getVersion();
+});
+
+ipcMain.on('open-external-url', (_event, url) => {
+  if (url && (url.startsWith('https://') || url.startsWith('http://'))) {
+    shell.openExternal(url);
+  }
+});
+
 app.whenReady().then(() => {
   startServer();
   waitForServer(() => {

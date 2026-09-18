@@ -372,3 +372,32 @@ export interface UploadedPdfRecord {
   }>;
 }
 
+// ── App Updates & Version ──
+
+export interface AppVersionInfo {
+  latestVersion: string;
+  releaseDate: string;
+  releaseNotes: string[];
+  downloadUrl: string;
+  mandatory: boolean;
+  minSupportedVersion?: string;
+  currentVersion: string;
+  hasUpdate: boolean;
+}
+
+declare global {
+  interface Window {
+    electronAPI?: {
+      platform: string;
+      isElectron: boolean;
+      appVersion?: string;
+      getAppVersion?: () => Promise<string>;
+      openExternalUrl?: (url: string) => void;
+      minimizeWindow?: () => void;
+      maximizeWindow?: () => void;
+      closeWindow?: () => void;
+    };
+  }
+}
+
+

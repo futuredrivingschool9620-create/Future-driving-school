@@ -15,6 +15,7 @@ import renewalRoutes from './routes/renewal.routes.js';
 import dashboardRoutes from './routes/dashboard.routes.js';
 import sseRoutes from './routes/sse.routes.js';
 import vehicleRoutes from './routes/vehicle.routes.js';
+import updateRoutes from './routes/update.routes.js';
 
 const app = express();
 
@@ -67,6 +68,7 @@ app.use('/api/renewals', renewalRoutes);
 app.use('/api/vehicles', vehicleRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/events', sseRoutes);
+app.use('/api/app', updateRoutes);
 
 // ── 404 Handler ──
 app.use((_req, res) => {
