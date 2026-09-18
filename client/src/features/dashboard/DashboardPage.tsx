@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { customerApi, documentApi } from '../../lib/api';
+import { customerApi, documentApi, dashboardApi } from '../../lib/api';
 import type { Customer, FilteredDocument, DashboardFilters } from '../../types';
 import StatusBadge from '../../components/shared/StatusBadge';
 import { useSSE } from '../../hooks/useSSE';
@@ -43,6 +43,11 @@ export default function DashboardPage() {
 
   // Active mode
   const [mode, setMode] = useState<'idle' | 'search' | 'filter'>('idle');
+
+  // Reminder triggers & alerts
+  const [isRunningExpiryCheck, setIsRunningExpiryCheck] = useState(false);
+  const [sendingDocId, setSendingDocId] = useState<string | null>(null);
+  const [alertNotice, setAlertNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Debounced search
   useEffect(() => {
@@ -98,6 +103,46 @@ export default function DashboardPage() {
     setMode('idle');
   };
 
+  const handleRunExpiryCheck = async () => {
+    try {
+      setIsRunningExpiryCheck(true);
+      setAlertNotice(null);
+      const res = await dashboardApi.triggerCheck();
+      const sentMsg = res.notificationsSent !== undefined
+        ? `✅ Expiry check finished! Scanned ${res.totalDocumentsScanned || 0} documents. Sent ${res.notificationsSent} WhatsApp reminder(s) (${res.skipped || 0} skipped).`
+        : res.message || '✅ Expiry check completed successfully!';
+      setAlertNotice({ type: 'success', message: sentMsg });
+      if (mode === 'filter') {
+        applyFilters();
+      }
+    } catch (err: any) {
+      const errMsg = err?.response?.data?.message || err?.message || 'Failed to run expiry check';
+      setAlertNotice({ type: 'error', message: errMsg });
+    } finally {
+      setIsRunningExpiryCheck(false);
+    }
+  };
+
+  const handleSendWhatsApp = async (doc: FilteredDocument) => {
+    try {
+      setSendingDocId(doc.id);
+      setAlertNotice(null);
+      const res = await documentApi.sendReminder(doc.id);
+      setAlertNotice({
+        type: 'success',
+        message: res.message || `✅ WhatsApp reminder sent to ${doc.customer.firstName} (${doc.customer.phoneNumber})!`,
+      });
+      if (mode === 'filter') {
+        applyFilters();
+      }
+    } catch (err: any) {
+      const errMsg = err?.response?.data?.message || err?.message || 'Failed to send WhatsApp message';
+      setAlertNotice({ type: 'error', message: errMsg });
+    } finally {
+      setSendingDocId(null);
+    }
+  };
+
   // Real-time updates via SSE
   useSSE((event) => {
     if (event.type === 'CUSTOMER_UPDATE' || event.type === 'DOCUMENT_UPDATE') {
@@ -115,21 +160,80 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto">
+      {/* Alert Notice Banner */}
+      {alertNotice && (
+        <div
+          className={`flex items-center justify-between p-4 rounded-2xl border shadow-lg transition-all animate-fadeIn ${
+            alertNotice.type === 'success'
+              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-800 dark:text-emerald-200'
+              : 'bg-rose-500/10 border-rose-500/30 text-rose-800 dark:text-rose-200'
+          }`}
+        >
+          <div className="flex items-center gap-3">
+            {alertNotice.type === 'success' ? (
+              <div className="w-8 h-8 rounded-xl bg-emerald-500 text-white flex items-center justify-center shrink-0">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                </svg>
+              </div>
+            ) : (
+              <div className="w-8 h-8 rounded-xl bg-rose-500 text-white flex items-center justify-center shrink-0">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 8.25h.008v.008H12v-.008Z" />
+                </svg>
+              </div>
+            )}
+            <span className="text-sm font-semibold">{alertNotice.message}</span>
+          </div>
+          <button
+            onClick={() => setAlertNotice(null)}
+            className="text-xs font-bold px-2 py-1 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Hero Header */}
       <div className="relative overflow-hidden rounded-3xl p-8 sm:p-10 bg-gradient-to-br from-indigo-600 via-purple-600 to-fuchsia-600 text-white shadow-2xl shadow-indigo-500/30">
         <div className="absolute -top-24 -right-24 w-72 h-72 rounded-full bg-white/10 blur-3xl pointer-events-none" />
         <div className="absolute -bottom-32 -left-16 w-80 h-80 rounded-full bg-fuchsia-400/20 blur-3xl pointer-events-none" />
-        <div className="relative">
-          <span className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-white/80 bg-white/15 backdrop-blur px-3 py-1 rounded-full">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse" />
-            Document Tracker
-          </span>
-          <h1 className="mt-4 text-3xl sm:text-4xl font-extrabold tracking-tight">
-            Stay ahead of every expiry
-          </h1>
-          <p className="mt-2 text-sm sm:text-base text-white/80 max-w-xl">
-            Find customers instantly or filter documents by status and date to catch renewals before they lapse.
-          </p>
+        <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div>
+            <span className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-white/80 bg-white/15 backdrop-blur px-3 py-1 rounded-full">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse" />
+              Document Tracker
+            </span>
+            <h1 className="mt-4 text-3xl sm:text-4xl font-extrabold tracking-tight">
+              Stay ahead of every expiry
+            </h1>
+            <p className="mt-2 text-sm sm:text-base text-white/80 max-w-xl">
+              Find customers instantly, filter documents by status, and auto-dispatch WhatsApp renewal reminders.
+            </p>
+          </div>
+
+          {/* Quick Action: Send Reminders Now */}
+          <button
+            type="button"
+            onClick={handleRunExpiryCheck}
+            disabled={isRunningExpiryCheck}
+            className="inline-flex items-center gap-2.5 px-6 py-3.5 bg-white/20 hover:bg-white/30 active:scale-95 text-white font-bold text-sm rounded-2xl border border-white/30 shadow-lg shadow-black/10 backdrop-blur-md transition-all hover:scale-105 disabled:opacity-50 cursor-pointer shrink-0"
+            title="Scan all documents and dispatch WhatsApp reminders to customers"
+          >
+            {isRunningExpiryCheck ? (
+              <>
+                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <span>Checking & Sending...</span>
+              </>
+            ) : (
+              <>
+                <svg className="w-5 h-5 text-emerald-300" fill="none" viewBox="0 0 24 24" strokeWidth={2.2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+                </svg>
+                <span>⚡ Send WhatsApp Reminders Now</span>
+              </>
+            )}
+          </button>
         </div>
       </div>
 
@@ -622,6 +726,25 @@ export default function DashboardPage() {
                     )}
                   </div>
                   <StatusBadge status={doc.status} daysRemaining={doc.daysRemaining} compact />
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSendWhatsApp(doc);
+                    }}
+                    disabled={sendingDocId === doc.id}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold transition-all shadow-sm hover:scale-105 active:scale-95 disabled:opacity-50 cursor-pointer shrink-0"
+                    title={`Send WhatsApp reminder to ${doc.customer.phoneNumber}`}
+                  >
+                    {sendingDocId === doc.id ? (
+                      <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <svg className="w-3 h-3 fill-current" viewBox="0 0 24 24">
+                        <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/>
+                      </svg>
+                    )}
+                    <span className="hidden sm:inline">WhatsApp</span>
+                  </button>
                   <svg
                     className="w-4 h-4 shrink-0 hidden sm:block opacity-0 group-hover:opacity-100 transition-opacity text-indigo-500"
                     fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"

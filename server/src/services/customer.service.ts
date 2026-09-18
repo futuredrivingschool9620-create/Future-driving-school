@@ -39,11 +39,15 @@ export class CustomerService {
 
     // Enrich with computed document statuses
     const enriched = customers.map((customer) => {
-      const enrichedVehicles = customer.vehicles.map((v) => ({
-        ...v,
-        currentDocuments: DocumentStatusService.buildDocumentSummary(v.documents),
-        allDocuments: v.documents.map((d) => DocumentStatusService.enrichDocumentWithStatus(d)),
-      }));
+      const enrichedVehicles = customer.vehicles.map((v) => {
+        const hasExpiredDoc = v.documents.some((d) => d.isCurrent && new Date(d.endDate).getTime() < new Date().setHours(0, 0, 0, 0));
+        return {
+          ...v,
+          status: hasExpiredDoc ? 'Expired' : v.status,
+          currentDocuments: DocumentStatusService.buildDocumentSummary(v.documents),
+          allDocuments: v.documents.map((d) => DocumentStatusService.enrichDocumentWithStatus(d)),
+        };
+      });
 
       return {
         ...customer,
@@ -104,11 +108,15 @@ export class CustomerService {
     }
 
     const currentDocs = customer.documents.filter((d) => d.isCurrent);
-    const enrichedVehicles = customer.vehicles.map((v) => ({
-      ...v,
-      currentDocuments: DocumentStatusService.buildDocumentSummary(v.documents.filter((d) => d.isCurrent)),
-      allDocuments: v.documents.map((d) => DocumentStatusService.enrichDocumentWithStatus(d)),
-    }));
+    const enrichedVehicles = customer.vehicles.map((v) => {
+      const hasExpiredDoc = v.documents.some((d) => d.isCurrent && new Date(d.endDate).getTime() < new Date().setHours(0, 0, 0, 0));
+      return {
+        ...v,
+        status: hasExpiredDoc ? 'Expired' : v.status,
+        currentDocuments: DocumentStatusService.buildDocumentSummary(v.documents.filter((d) => d.isCurrent)),
+        allDocuments: v.documents.map((d) => DocumentStatusService.enrichDocumentWithStatus(d)),
+      };
+    });
 
     return {
       ...customer,

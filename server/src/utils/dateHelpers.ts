@@ -100,7 +100,7 @@ export function getReminderType(daysRemaining: number): string | null {
   if (daysRemaining === 3) return 'SEVEN_DAY_3';
   if (daysRemaining === 2) return 'SEVEN_DAY_2';
   if (daysRemaining === 1) return 'SEVEN_DAY_1';
-  if (daysRemaining === 0) return 'EXPIRY_DAY';
+  if (daysRemaining <= 0) return 'EXPIRY_DAY';
   return null;
 }
 

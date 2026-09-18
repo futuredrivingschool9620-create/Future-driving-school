@@ -56,8 +56,8 @@ export class DashboardController {
 
   static async triggerExpiryCheck(_req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      await SchedulerService.runExpiryCheck();
-      res.json({ message: 'Expiry check completed successfully' });
+      const result = await SchedulerService.runExpiryCheck();
+      res.json({ message: 'Expiry check completed successfully', ...result });
     } catch (error) {
       next(error);
     }

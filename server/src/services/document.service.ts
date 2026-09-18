@@ -1,9 +1,12 @@
 import { prisma } from '../lib/prisma.js';
-import { NotFoundError } from '../utils/errors.js';
+import { NotFoundError, BadRequestError } from '../utils/errors.js';
 import { AuditService } from './audit.service.js';
 import { DocumentStatusService } from './documentStatus.service.js';
 import type { CreateDocumentInput } from '../validators/document.schema.js';
 import { SSEService } from './sse.service.js';
+import { WhatsAppService } from './whatsapp.service.js';
+import { env } from '../config/env.js';
+import { getDaysRemaining, getReminderType, getTodayIST, formatDateIN } from '../utils/dateHelpers.js';
 
 export class DocumentService {
   /**
@@ -449,5 +452,111 @@ export class DocumentService {
       ...DocumentStatusService.enrichDocumentWithStatus(doc),
       customer: doc.customer,
     }));
+  }
+
+  /**
+   * Send a WhatsApp renewal reminder for a specific document immediately.
+   */
+  static async sendReminder(id: string, adminId: string, ipAddress?: string) {
+    const document = await prisma.document.findUnique({
+      where: { id },
+      include: {
+        customer: true,
+        vehicle: true,
+      },
+    });
+
+    if (!document) {
+      throw new NotFoundError('Document not found');
+    }
+    if (!document.customer || !document.customer.isActive) {
+      throw new BadRequestError('Customer is inactive or not found');
+    }
+
+    const customerName = [document.customer.firstName, document.customer.secondName].filter(Boolean).join(' ');
+    const vehicleNumber = document.vehicle?.vehicleNumber || document.customer.vehicleNumber || 'Vehicle';
+    const phoneNumber = document.customer.phoneNumber;
+    const daysRemaining = getDaysRemaining(document.endDate);
+
+    const daysStr =
+      daysRemaining === 0 ? '0 days (TODAY)'
+      : daysRemaining === 1 ? '1 day (TOMORROW)'
+      : daysRemaining > 1 ? `${daysRemaining} days`
+      : `EXPIRED (${Math.abs(daysRemaining)} days ago)`;
+
+    const templateParams = [
+      customerName,
+      vehicleNumber,
+      document.documentName || 'Document',
+      formatDateIN(document.endDate),
+      daysStr,
+    ];
+
+    const templateName = env.WHATSAPP_TEMPLATE_NAME || 'future_driving_school';
+    const result = await WhatsAppService.sendTemplate(
+      phoneNumber,
+      templateName,
+      templateParams,
+      true
+    );
+
+    if (!result.success) {
+      throw new BadRequestError(result.error || 'Failed to send WhatsApp message via Meta API');
+    }
+
+    const today = getTodayIST();
+    const reminderTypeStr = getReminderType(daysRemaining) || 'MANUAL';
+    const message = `Future Driving School reminder for ${document.documentName} (${vehicleNumber})`;
+
+    await prisma.notification.create({
+      data: {
+        customerId: document.customerId,
+        vehicleId: document.vehicleId || null,
+        documentId: document.id,
+        customerName,
+        phoneNumber,
+        vehicleNumber,
+        documentType: document.documentName,
+        originalExpiryDate: document.endDate,
+        currentExpiryDate: document.endDate,
+        reminderType: reminderTypeStr as any,
+        message,
+        calendarDay: today,
+        notificationStatus: 'SENT',
+        deliveryStatus: 'SENT',
+        sentDate: new Date(),
+        sentTime: new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' }),
+        providerMessageId: result.messageId,
+      },
+    });
+
+    // Auto-update vehicle status to Expired if document is expired
+    if (daysRemaining <= 0 && document.vehicleId) {
+      try {
+        await prisma.vehicle.update({
+          where: { id: document.vehicleId },
+          data: { status: 'Expired', updatedByAdminId: adminId },
+        });
+      } catch {}
+    }
+
+    await AuditService.log({
+      adminId,
+      entityType: 'Document',
+      entityId: id,
+      action: 'UPDATE',
+      newData: { manualReminderSent: true, messageId: result.messageId, to: phoneNumber },
+      ipAddress,
+    });
+
+    SSEService.broadcast({ type: 'DOCUMENT_UPDATE', data: { documentId: id, customerId: document.customerId } });
+
+    return {
+      success: true,
+      message: `WhatsApp reminder sent to ${customerName} (${phoneNumber})`,
+      messageId: result.messageId,
+      customerName,
+      phoneNumber,
+    };
   }
 }

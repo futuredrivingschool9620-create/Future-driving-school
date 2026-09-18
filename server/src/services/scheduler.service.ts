@@ -124,6 +124,16 @@ export class SchedulerService {
         continue;
       }
 
+      // Auto-update vehicle status to Expired if document is expired
+      if (daysRemaining <= 0 && doc.vehicleId) {
+        try {
+          await prisma.vehicle.update({
+            where: { id: doc.vehicleId },
+            data: { status: 'Expired' },
+          });
+        } catch {}
+      }
+
       // Build notification message
       const message = this.buildMessage(
         customerName,
@@ -161,7 +171,12 @@ export class SchedulerService {
         let sent = false;
 
         if (env.WHATSAPP_ENABLED) {
-          const daysStr = daysRemaining === 0 ? '0 (TODAY)' : daysRemaining === 1 ? '1 (TOMORROW)' : `${daysRemaining}`;
+          const daysStr =
+            daysRemaining === 0 ? '0 days (TODAY)'
+            : daysRemaining === 1 ? '1 day (TOMORROW)'
+            : daysRemaining > 1 ? `${daysRemaining} days`
+            : `EXPIRED (${Math.abs(daysRemaining)} days ago)`;
+
           const params = [
             customerName,
             targetVehicleNumber,
@@ -173,7 +188,8 @@ export class SchedulerService {
           const result = await WhatsAppService.sendTemplate(
             doc.customer.phoneNumber,
             env.WHATSAPP_TEMPLATE_NAME,
-            params
+            params,
+            true
           );
           if (result.success) {
             await NotificationService.markSent(notification.id, result.messageId);
@@ -207,6 +223,12 @@ export class SchedulerService {
     }
 
     console.log(`  📊 Summary: ${notificationsCreated} created, ${notificationsSent} sent, ${skipped} skipped`);
+    return {
+      totalDocumentsScanned: documents.length,
+      notificationsCreated,
+      notificationsSent,
+      skipped,
+    };
   }
 
   /**

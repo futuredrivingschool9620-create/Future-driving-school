@@ -40,7 +40,7 @@ function getReminderType(daysRemaining: number): string | null {
   if (daysRemaining === 3) return 'SEVEN_DAY_3';
   if (daysRemaining === 2) return 'SEVEN_DAY_2';
   if (daysRemaining === 1) return 'SEVEN_DAY_1';
-  if (daysRemaining <= 0 && daysRemaining >= -30) return 'EXPIRY_DAY';
+  if (daysRemaining <= 0) return 'EXPIRY_DAY';
   return null;
 }
 
@@ -248,15 +248,21 @@ async function sendWhatsAppTemplateMessage(
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
 
-  // 1. Security: Reject any request that isn't from Vercel Cron
+  // 1. Security: Allow Vercel Cron, or authorized manual trigger
   const authHeader = req.headers['authorization'];
   const cronSecret = process.env.CRON_SECRET;
+  const querySecret = (req.query?.secret as string) || (req.query?.key as string);
 
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  const isAuthorized =
+    !cronSecret ||
+    authHeader === `Bearer ${cronSecret}` ||
+    querySecret === cronSecret;
+
+  if (!isAuthorized) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  if (req.method !== 'GET') {
+  if (req.method !== 'GET' && req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
@@ -342,7 +348,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         continue;
       }
 
-      // 5. Build plain-text message (stored in DB / SMS fallback)
+      // 5. Auto-update vehicle status to Expired if document is expired
+      if (daysRemaining <= 0 && doc.vehicleId) {
+        try {
+          await prisma.vehicle.update({
+            where: { id: doc.vehicleId },
+            data: { status: 'Expired' },
+          });
+        } catch {}
+      }
+
+      // 6. Build plain-text message (stored in DB / SMS fallback)
       const daysStr =
         daysRemaining === 0 ? '0 days (TODAY)'
         : daysRemaining === 1 ? '1 day (TOMORROW)'

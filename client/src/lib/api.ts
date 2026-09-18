@@ -288,6 +288,11 @@ export const documentApi = {
   getUploadedPdfDownloadUrl: (id: string): string => {
     return `${API_BASE}/documents/uploaded-pdfs/${id}/download`;
   },
+
+  sendReminder: async (id: string): Promise<{ success: boolean; message: string; messageId?: string }> => {
+    const { data } = await api.post<{ success: boolean; message: string; messageId?: string }>(`/documents/${id}/send-reminder`);
+    return data;
+  },
 };
 
 // ── Notification API ──
@@ -341,8 +346,14 @@ export const dashboardApi = {
     return data;
   },
 
-  triggerCheck: async (): Promise<{ message: string }> => {
-    const { data } = await api.post<{ message: string }>('/dashboard/trigger-check');
+  triggerCheck: async (): Promise<{
+    message: string;
+    totalDocumentsScanned?: number;
+    notificationsCreated?: number;
+    notificationsSent?: number;
+    skipped?: number;
+  }> => {
+    const { data } = await api.post('/dashboard/trigger-check');
     return data;
   },
 

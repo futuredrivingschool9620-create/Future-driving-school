@@ -81,4 +81,14 @@ export class DocumentController {
       next(error);
     }
   }
+
+  static async sendReminder(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const adminId = req.admin!.adminId;
+      const result = await DocumentService.sendReminder(getParam(req, 'id'), adminId, getIp(req));
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
 }
