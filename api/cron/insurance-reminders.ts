@@ -495,12 +495,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
     const summary = {
       success:                true,
+      version:                '2.1-all-expired',
       runAt:                  new Date().toISOString(),
       elapsedSeconds:         parseFloat(elapsed),
       totalDocumentsScanned:  documents.length,
       notificationsCreated,
       notificationsSent,
       skipped,
+      scannedDetails: documents.map(d => ({
+        customer: `${d.customer.firstName} ${d.customer.secondName || ''}`.trim(),
+        phone: d.customer.phoneNumber,
+        vehicle: d.vehicle?.vehicleNumber,
+        docName: d.documentName,
+        endDate: d.endDate,
+        daysRemaining: getDaysRemaining(d.endDate),
+        reminderType: getReminderType(getDaysRemaining(d.endDate)),
+      })),
       whatsappStatus:         templateConfig.status,
       ...(templateConfig.notice && { whatsappNotice: templateConfig.notice }),
       ...(errors.length > 0 && { errors }),
