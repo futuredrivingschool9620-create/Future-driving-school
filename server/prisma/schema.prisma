@@ -134,6 +134,8 @@ model Customer {
   @@index([drivingLicenceNumber])
   @@index([uploadedPdfId])
   @@index([isActive])
+  @@index([isActive, createdAt(sort: Desc)])
+  @@index([createdAt(sort: Desc)])
   @@map("customers")
 }
 
@@ -161,6 +163,8 @@ model Vehicle {
   @@index([vehicleNumber])
   @@index([isActive])
   @@index([status])
+  @@index([customerId, isActive, createdAt(sort: Asc)])
+  @@index([vehicleNumber, isActive])
   @@map("vehicles")
 }
 
@@ -193,6 +197,11 @@ model Document {
   @@index([endDate])
   @@index([isActive, isCurrent])
   @@index([customerId, documentName, isCurrent])
+  @@index([isActive, isCurrent, endDate(sort: Asc)])
+  @@index([isActive, isCurrent, documentName, endDate(sort: Asc)])
+  @@index([vehicleId, isActive, isCurrent])
+  @@index([customerId, isActive, isCurrent])
+  @@index([createdAt(sort: Desc)])
   @@map("documents")
 }
 
@@ -233,6 +242,9 @@ model Notification {
   @@index([sentDate])
   @@index([calendarDay])
   @@index([createdAt])
+  @@index([sentDate, notificationStatus])
+  @@index([customerId, notificationStatus])
+  @@index([documentId, notificationStatus])
   @@map("notifications")
 }
 
@@ -260,6 +272,8 @@ model RenewalHistory {
   @@index([vehicleId])
   @@index([documentId])
   @@index([renewalDate])
+  @@index([customerId, renewalDate(sort: Desc)])
+  @@index([documentId, renewalDate(sort: Desc)])
   @@map("renewal_history")
 }
 

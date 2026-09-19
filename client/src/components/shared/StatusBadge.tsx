@@ -75,6 +75,7 @@ export default function StatusBadge({ status, daysRemaining, compact = false }: 
   };
 
   const getDaysText = () => {
+    if (daysRemaining === undefined || daysRemaining === null || isNaN(daysRemaining)) return '';
     if (status === DocumentStatus.EXPIRES_TODAY) return 'Today!';
     if (status === DocumentStatus.EXPIRED) {
       const days = Math.abs(daysRemaining);
@@ -86,19 +87,21 @@ export default function StatusBadge({ status, daysRemaining, compact = false }: 
   if (compact) {
     return (
       <span
-        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${config.bgClass} ${config.textClass}`}
+        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${config.bgClass} ${config.textClass}`}
       >
-        <span className={`w-1.5 h-1.5 rounded-full ${config.dotClass}`} />
+        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${config.dotClass}`} />
         {config.label}
       </span>
     );
   }
 
+  const daysText = getDaysText();
+
   return (
     <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm font-medium ${config.bgClass} ${config.textClass}`}>
       <span className={`w-2 h-2 rounded-full flex-shrink-0 ${config.dotClass}`} />
       <span>{config.label}</span>
-      <span className="text-xs opacity-75">— {getDaysText()}</span>
+      {daysText && <span className="text-xs opacity-75">— {daysText}</span>}
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { documentApi, dashboardApi } from '../../lib/api';
 import type { FilteredDocument, UploadedPdfRecord } from '../../types';
 import StatusBadge from '../../components/shared/StatusBadge';
 import ExportDocumentsModal from './ExportDocumentsModal';
+import { useVirtualTable } from '../../hooks/useVirtualTable';
 
 export default function DocumentsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -35,10 +36,30 @@ export default function DocumentsPage() {
   const [newEndDate, setNewEndDate] = useState('');
   const [isSubmittingRenewal, setIsSubmittingRenewal] = useState(false);
 
+  // Delete document state
+  const [documentToDelete, setDocumentToDelete] = useState<FilteredDocument | null>(null);
+  const [isDeletingDocument, setIsDeletingDocument] = useState(false);
+  const [deleteDocumentError, setDeleteDocumentError] = useState('');
+
   // Expiry check & reminder triggers
   const [isRunningExpiryCheck, setIsRunningExpiryCheck] = useState(false);
   const [sendingDocId, setSendingDocId] = useState<string | null>(null);
   const [alertNotice, setAlertNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  // Virtualization for documents and uploaded PDFs
+  const {
+    containerRef: docContainerRef,
+    visibleItems: visibleDocs,
+    topSpacerHeight: docTopSpacer,
+    bottomSpacerHeight: docBottomSpacer,
+  } = useVirtualTable({ items: documents, estimatedRowHeight: 72 });
+
+  const {
+    containerRef: pdfContainerRef,
+    visibleItems: visiblePdfs,
+    topSpacerHeight: pdfTopSpacer,
+    bottomSpacerHeight: pdfBottomSpacer,
+  } = useVirtualTable({ items: uploadedPdfs, estimatedRowHeight: 64 });
 
   const fetchDocuments = useCallback(async () => {
     try {
@@ -109,6 +130,22 @@ export default function DocumentsPage() {
       alert('Failed to renew document. Please check dates.');
     } finally {
       setIsSubmittingRenewal(false);
+    }
+  };
+
+  const handleConfirmDeleteDocument = async () => {
+    if (!documentToDelete) return;
+    try {
+      setIsDeletingDocument(true);
+      setDeleteDocumentError('');
+      await documentApi.delete(documentToDelete.id);
+      setDocumentToDelete(null);
+      fetchDocuments();
+    } catch (error: any) {
+      console.error('Failed to delete document:', error);
+      setDeleteDocumentError(error?.response?.data?.error || 'Failed to delete document.');
+    } finally {
+      setIsDeletingDocument(false);
     }
   };
 
@@ -307,7 +344,7 @@ export default function DocumentsPage() {
             </button>
           </div>
 
-          <div className="overflow-x-auto">
+          <div ref={pdfContainerRef} className="overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
               <thead className="bg-slate-50/50 dark:bg-slate-800/50">
                 <tr>
@@ -338,8 +375,12 @@ export default function DocumentsPage() {
                     </td>
                   </tr>
                 ) : (
-                  uploadedPdfs.map(pdf => (
-                    <tr key={pdf.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/80 transition-colors">
+                  <>
+                    {pdfTopSpacer > 0 && (
+                      <tr style={{ height: pdfTopSpacer, border: 0 }}><td colSpan={7} style={{ height: pdfTopSpacer, padding: 0, border: 0 }} /></tr>
+                    )}
+                    {visiblePdfs.map(({ item: pdf }) => (
+                      <tr key={pdf.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/80 transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-lg bg-rose-100 dark:bg-rose-900/50 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
@@ -405,7 +446,11 @@ export default function DocumentsPage() {
                         </a>
                       </td>
                     </tr>
-                  ))
+                  ))}
+                  {pdfBottomSpacer > 0 && (
+                    <tr style={{ height: pdfBottomSpacer, border: 0 }}><td colSpan={7} style={{ height: pdfBottomSpacer, padding: 0, border: 0 }} /></tr>
+                  )}
+                </>
                 )}
               </tbody>
             </table>
@@ -475,7 +520,7 @@ export default function DocumentsPage() {
 
           {/* Table */}
           <div className="glass-card overflow-hidden">
-            <div className="overflow-x-auto">
+            <div ref={docContainerRef} className="overflow-x-auto">
               <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
                 <thead className="bg-slate-50/50 dark:bg-slate-800/50">
                   <tr>
@@ -515,8 +560,12 @@ export default function DocumentsPage() {
                       </td>
                     </tr>
                   ) : (
-                    documents.map((doc) => (
-                      <tr key={doc.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/80 transition-colors">
+                    <>
+                      {docTopSpacer > 0 && (
+                        <tr style={{ height: docTopSpacer, border: 0 }}><td colSpan={6} style={{ height: docTopSpacer, padding: 0, border: 0 }} /></tr>
+                      )}
+                      {visibleDocs.map(({ item: doc }) => (
+                        <tr key={doc.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/80 transition-colors">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <Link
                             to={`/customers/${doc.customer.id}`}
@@ -599,10 +648,29 @@ export default function DocumentsPage() {
                                 Pre-Renew
                               </button>
                             )}
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setDocumentToDelete(doc);
+                                setDeleteDocumentError('');
+                              }}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 rounded-lg text-xs font-bold transition-all shadow-sm hover:scale-105 active:scale-95 cursor-pointer"
+                              title={`Delete ${doc.documentName}`}
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                              </svg>
+                              <span>Delete</span>
+                            </button>
                           </div>
                         </td>
                       </tr>
-                    ))
+                    ))}
+                    {docBottomSpacer > 0 && (
+                      <tr style={{ height: docBottomSpacer, border: 0 }}><td colSpan={6} style={{ height: docBottomSpacer, padding: 0, border: 0 }} /></tr>
+                    )}
+                  </>
                   )}
                 </tbody>
               </table>
@@ -795,6 +863,57 @@ export default function DocumentsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Document Confirmation Modal */}
+      {documentToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4">
+            <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-950/50 text-red-600 flex items-center justify-center mx-auto">
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+              </svg>
+            </div>
+
+            <div className="text-center space-y-1.5">
+              <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                Delete Document &ldquo;{documentToDelete.documentName}&rdquo;?
+              </h3>
+              <p className="text-xs text-slate-500">
+                Are you sure you want to permanently delete this {documentToDelete.documentName} document for customer{' '}
+                <span className="font-semibold text-slate-700 dark:text-slate-300">
+                  {documentToDelete.customer?.firstName} {documentToDelete.customer?.secondName || ''}
+                </span>{' '}
+                ({documentToDelete.customer?.vehicleNumber || 'Vehicle'})? This action cannot be undone.
+              </p>
+            </div>
+
+            {deleteDocumentError && (
+              <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 text-red-600 text-xs font-semibold">
+                {deleteDocumentError}
+              </div>
+            )}
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                disabled={isDeletingDocument}
+                onClick={() => setDocumentToDelete(null)}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeletingDocument}
+                onClick={handleConfirmDeleteDocument}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-md shadow-red-500/20 transition-all cursor-pointer disabled:opacity-50"
+              >
+                {isDeletingDocument ? 'Deleting...' : 'Delete Document'}
+              </button>
+            </div>
           </div>
         </div>
       )}

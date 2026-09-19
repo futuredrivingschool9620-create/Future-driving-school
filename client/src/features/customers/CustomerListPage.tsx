@@ -3,8 +3,90 @@ import { Link, useLocation } from 'react-router-dom';
 import { customerApi } from '../../lib/api';
 import { validatePhoneNumber } from '../../lib/phoneValidation';
 import { validateAndFormatVehicleNumber } from '../../lib/vehicleValidation';
-import type { Customer, DocumentWithStatus } from '../../types';
+import type { Customer } from '../../types';
 import StatusBadge from '../../components/shared/StatusBadge';
+import { useVirtualTable } from '../../hooks/useVirtualTable';
+
+const enrichDocStatus = (doc: any) => {
+  if (!doc) return null;
+  let status = doc.status;
+  let daysRemaining = doc.daysRemaining;
+  if (!status && doc.endDate) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const end = new Date(doc.endDate);
+    end.setHours(0, 0, 0, 0);
+    daysRemaining = Math.ceil((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    if (daysRemaining < 0) status = 'EXPIRED';
+    else if (daysRemaining === 0) status = 'EXPIRES_TODAY';
+    else if (daysRemaining <= 7) status = 'CRITICAL';
+    else if (daysRemaining <= 15) status = 'DUE_SOON';
+    else if (daysRemaining <= 30) status = 'UPCOMING';
+    else status = 'ACTIVE';
+  }
+  return {
+    ...doc,
+    status: status || 'ACTIVE',
+    daysRemaining: daysRemaining ?? 0,
+  };
+};
+
+interface CategorizedDocs {
+  insuranceDoc: any;
+  fcDoc: any;
+  taxDoc: any;
+  otherDocs: any[];
+}
+
+const categorizeDocList = (rawDocs: any[]): CategorizedDocs => {
+  let insuranceDoc: any = null;
+  let fcDoc: any = null;
+  let taxDoc: any = null;
+  const otherDocs: any[] = [];
+
+  for (const raw of rawDocs) {
+    if (raw.isCurrent === false) continue;
+    const doc = enrichDocStatus(raw);
+    if (!doc) continue;
+    const name = (doc.documentName || '').toLowerCase().trim();
+    if (name.includes('insurance') || name === 'ins') {
+      if (!insuranceDoc) insuranceDoc = doc;
+      else otherDocs.push(doc);
+    } else if (name.includes('fitness') || name === 'fc' || name.includes('(fc)')) {
+      if (!fcDoc) fcDoc = doc;
+      else otherDocs.push(doc);
+    } else if (name.includes('tax')) {
+      if (!taxDoc) taxDoc = doc;
+      else otherDocs.push(doc);
+    } else {
+      otherDocs.push(doc);
+    }
+  }
+
+  return { insuranceDoc, fcDoc, taxDoc, otherDocs };
+};
+
+const getVehicleDocCategories = (v: any): CategorizedDocs => {
+  let docList: any[] = [];
+  if (v.allDocuments && Array.isArray(v.allDocuments) && v.allDocuments.length > 0) {
+    docList = v.allDocuments;
+  } else if (v.currentDocuments && typeof v.currentDocuments === 'object') {
+    docList = Object.values(v.currentDocuments);
+  } else if (v.documents && Array.isArray(v.documents)) {
+    docList = v.documents;
+  }
+  return categorizeDocList(docList);
+};
+
+const getCustomerDocCategories = (customer: any): CategorizedDocs => {
+  let docList: any[] = [];
+  if (customer.currentDocuments && typeof customer.currentDocuments === 'object') {
+    docList = Object.values(customer.currentDocuments);
+  } else if (customer.documents && Array.isArray(customer.documents)) {
+    docList = customer.documents;
+  }
+  return categorizeDocList(docList);
+};
 
 export default function CustomerListPage() {
   const location = useLocation();
@@ -18,6 +100,11 @@ export default function CustomerListPage() {
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [customerToDelete, setCustomerToDelete] = useState<{ id: string; name: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const { containerRef, visibleItems, topSpacerHeight, bottomSpacerHeight } = useVirtualTable({
+    items: customers,
+    estimatedRowHeight: 80,
+  });
 
   useEffect(() => {
     if (location.state?.message) {
@@ -80,7 +167,7 @@ export default function CustomerListPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-6 w-full mx-auto">
       {/* Toast Feedback */}
       {successMessage && (
         <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-sm flex items-center justify-between shadow-sm">
@@ -173,23 +260,32 @@ export default function CustomerListPage() {
 
       {/* Customer List */}
       <div className="glass-card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+        <div ref={containerRef} className="overflow-x-auto">
+          <table className="min-w-[1360px] w-full divide-y divide-slate-200 dark:divide-slate-700">
             <thead className="bg-slate-50/50 dark:bg-slate-800/50">
               <tr>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                <th className="px-4 py-3.5 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider min-w-[200px]">
                   Customer
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                <th className="px-4 py-3.5 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider min-w-[140px]">
                   Contact
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                  Vehicle
+                <th className="px-4 py-3.5 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider min-w-[280px]">
+                  Vehicles
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                  Documents
+                <th className="px-4 py-3.5 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider min-w-[140px]">
+                  Insurance
                 </th>
-                <th className="px-6 py-4 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                <th className="px-4 py-3.5 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider min-w-[140px]">
+                  Fitness (FC)
+                </th>
+                <th className="px-4 py-3.5 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider min-w-[140px]">
+                  Road Tax
+                </th>
+                <th className="px-4 py-3.5 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider min-w-[160px]">
+                  Other / Custom
+                </th>
+                <th className="px-4 py-3.5 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider min-w-[120px]">
                   Actions
                 </th>
               </tr>
@@ -197,14 +293,14 @@ export default function CustomerListPage() {
             <tbody className="divide-y divide-slate-200 dark:divide-slate-700 bg-white/50 dark:bg-slate-900/50">
               {isLoading ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center">
+                  <td colSpan={8} className="px-6 py-12 text-center">
                     <div className="inline-block w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
                     <p className="mt-4 text-slate-500">Loading customers...</p>
                   </td>
                 </tr>
               ) : customers.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center">
+                  <td colSpan={8} className="px-6 py-12 text-center">
                     <div className="mx-auto w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-4">
                       <svg className="w-8 h-8 text-slate-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
@@ -215,17 +311,21 @@ export default function CustomerListPage() {
                   </td>
                 </tr>
               ) : (
-                customers.map((customer: Customer) => {
-                  return (
-                    <tr key={customer.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/80 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap">
+                <>
+                  {topSpacerHeight > 0 && (
+                    <tr style={{ height: topSpacerHeight, border: 0 }}><td colSpan={8} style={{ height: topSpacerHeight, padding: 0, border: 0 }} /></tr>
+                  )}
+                  {visibleItems.map(({ item: customer }) => {
+                    return (
+                      <tr key={customer.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/80 transition-colors">
+                      <td className="px-4 py-4 whitespace-nowrap align-top">
                         <div className="flex items-center">
                           <div className="h-10 w-10 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/50 dark:to-purple-900/50 text-indigo-700 dark:text-indigo-300 flex items-center justify-center flex-shrink-0">
                             <span className="font-bold text-sm">
                               {customer.firstName.charAt(0)}{(customer.secondName || '').charAt(0)}
                             </span>
                           </div>
-                          <div className="ml-4">
+                          <div className="ml-3">
                             <div className="flex items-center gap-2">
                               <div className="text-sm font-semibold text-slate-900 dark:text-white">
                                 {customer.fullName || [customer.firstName, customer.secondName].filter(Boolean).join(' ') || customer.firstName}
@@ -237,7 +337,7 @@ export default function CustomerListPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-4 py-4 whitespace-nowrap align-top">
                         <div className="flex flex-col gap-1">
                           <div className="text-sm text-slate-900 dark:text-slate-300 font-mono">
                             <span>{customer.phoneNumber}</span>
@@ -252,14 +352,14 @@ export default function CustomerListPage() {
                           )}
                         </div>
                       </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-4 whitespace-nowrap align-top">
                       {customer.vehicles && customer.vehicles.length > 0 ? (
                         <div className="flex flex-col gap-2">
                           {customer.vehicles.map((v) => {
                             const vValid = validateAndFormatVehicleNumber(v.vehicleNumber).valid;
                             return (
-                              <div key={v.id} className="flex items-center gap-1.5 flex-wrap">
-                                <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold font-mono border ${
+                              <div key={v.id} className="flex items-center gap-2 h-8 whitespace-nowrap">
+                                <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold font-mono border shrink-0 ${
                                   vValid
                                     ? 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700'
                                     : 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-300 dark:border-rose-800'
@@ -267,10 +367,10 @@ export default function CustomerListPage() {
                                   {v.vehicleNumber}
                                   {!vValid && <span className="ml-1 text-[9px]">⚠️</span>}
                                 </span>
-                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 shrink-0">
                                   {v.vehicleType}
                                 </span>
-                                <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold shrink-0 ${
                                   v.status === 'Active'
                                     ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
                                     : v.status === 'Expired'
@@ -284,50 +384,175 @@ export default function CustomerListPage() {
                           })}
                         </div>
                       ) : (
-                        <div className="flex items-center gap-2">
-                          <div className="inline-flex items-center px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-xs font-bold font-mono text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                        <div className="flex items-center gap-2 h-8 whitespace-nowrap">
+                          <div className="inline-flex items-center px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-xs font-bold font-mono text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 shrink-0">
                             {customer.vehicleNumber || 'No vehicle'}
                           </div>
                           {customer.vehicleType && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/40">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/40 shrink-0">
                               {customer.vehicleType}
                             </span>
                           )}
                         </div>
                       )}
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-wrap gap-1.5 items-center">
-                        {customer.vehicles && customer.vehicles.length > 0 ? (
-                          customer.vehicles.flatMap((v) =>
-                            v.documents ? v.documents.filter((d) => d.isCurrent).map((doc) => ({ ...doc, vehicleNumber: v.vehicleNumber })) : []
-                          ).slice(0, 6).map((doc) => (
-                            <div
-                              key={doc.id}
-                              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-xs font-medium bg-slate-100/90 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 shadow-xs"
-                              title={`${doc.documentName} for ${doc.vehicleNumber}`}
-                            >
-                              <span className="font-semibold text-slate-700 dark:text-slate-300">{doc.documentName}:</span>
-                              <StatusBadge status={doc.status} daysRemaining={doc.daysRemaining} compact />
+                    {/* Insurance */}
+                    <td className="px-4 py-4 whitespace-nowrap align-top">
+                      {customer.vehicles && customer.vehicles.length > 0 ? (
+                        <div className="flex flex-col gap-2">
+                          {customer.vehicles.map((v) => {
+                            const { insuranceDoc } = getVehicleDocCategories(v);
+                            return (
+                              <div key={v.id} className="flex items-center h-8 whitespace-nowrap">
+                                {insuranceDoc ? (
+                                  <div className="shrink-0" title={`Insurance: Valid until ${new Date(insuranceDoc.endDate).toLocaleDateString('en-IN')}`}>
+                                    <StatusBadge status={insuranceDoc.status} daysRemaining={insuranceDoc.daysRemaining} compact />
+                                  </div>
+                                ) : (
+                                  <span className="text-slate-300 dark:text-slate-600 text-xs font-mono select-none pl-2">—</span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="flex items-center h-8 whitespace-nowrap">
+                          {getCustomerDocCategories(customer).insuranceDoc ? (
+                            <div className="shrink-0" title={`Insurance: Valid until ${new Date(getCustomerDocCategories(customer).insuranceDoc.endDate).toLocaleDateString('en-IN')}`}>
+                              <StatusBadge
+                                status={getCustomerDocCategories(customer).insuranceDoc.status}
+                                daysRemaining={getCustomerDocCategories(customer).insuranceDoc.daysRemaining}
+                                compact
+                              />
                             </div>
-                          ))
-                        ) : customer.currentDocuments && Object.values(customer.currentDocuments).length > 0 ? (
-                          Object.values(customer.currentDocuments).map((doc: DocumentWithStatus) => (
-                            <div
-                              key={doc.id}
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100/90 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 shadow-xs"
-                            >
-                              <span className="font-semibold text-slate-800 dark:text-slate-200">{doc.documentName}:</span>
-                              <StatusBadge status={doc.status} daysRemaining={doc.daysRemaining} compact />
-                            </div>
-                          ))
-                        ) : (
-                          <span className="text-xs text-slate-400 italic">No active documents</span>
-                        )}
-                      </div>
+                          ) : (
+                            <span className="text-slate-300 dark:text-slate-600 text-xs font-mono select-none pl-2">—</span>
+                          )}
+                        </div>
+                      )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex items-center justify-end gap-3">
+
+                    {/* Fitness (FC) */}
+                    <td className="px-4 py-4 whitespace-nowrap align-top">
+                      {customer.vehicles && customer.vehicles.length > 0 ? (
+                        <div className="flex flex-col gap-2">
+                          {customer.vehicles.map((v) => {
+                            const { fcDoc } = getVehicleDocCategories(v);
+                            return (
+                              <div key={v.id} className="flex items-center h-8 whitespace-nowrap">
+                                {fcDoc ? (
+                                  <div className="shrink-0" title={`Fitness (FC): Valid until ${new Date(fcDoc.endDate).toLocaleDateString('en-IN')}`}>
+                                    <StatusBadge status={fcDoc.status} daysRemaining={fcDoc.daysRemaining} compact />
+                                  </div>
+                                ) : (
+                                  <span className="text-slate-300 dark:text-slate-600 text-xs font-mono select-none pl-2">—</span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="flex items-center h-8 whitespace-nowrap">
+                          {getCustomerDocCategories(customer).fcDoc ? (
+                            <div className="shrink-0" title={`Fitness (FC): Valid until ${new Date(getCustomerDocCategories(customer).fcDoc.endDate).toLocaleDateString('en-IN')}`}>
+                              <StatusBadge
+                                status={getCustomerDocCategories(customer).fcDoc.status}
+                                daysRemaining={getCustomerDocCategories(customer).fcDoc.daysRemaining}
+                                compact
+                              />
+                            </div>
+                          ) : (
+                            <span className="text-slate-300 dark:text-slate-600 text-xs font-mono select-none pl-2">—</span>
+                          )}
+                        </div>
+                      )}
+                    </td>
+
+                    {/* Road Tax */}
+                    <td className="px-4 py-4 whitespace-nowrap align-top">
+                      {customer.vehicles && customer.vehicles.length > 0 ? (
+                        <div className="flex flex-col gap-2">
+                          {customer.vehicles.map((v) => {
+                            const { taxDoc } = getVehicleDocCategories(v);
+                            return (
+                              <div key={v.id} className="flex items-center h-8 whitespace-nowrap">
+                                {taxDoc ? (
+                                  <div className="shrink-0" title={`Road Tax: Valid until ${new Date(taxDoc.endDate).toLocaleDateString('en-IN')}`}>
+                                    <StatusBadge status={taxDoc.status} daysRemaining={taxDoc.daysRemaining} compact />
+                                  </div>
+                                ) : (
+                                  <span className="text-slate-300 dark:text-slate-600 text-xs font-mono select-none pl-2">—</span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="flex items-center h-8 whitespace-nowrap">
+                          {getCustomerDocCategories(customer).taxDoc ? (
+                            <div className="shrink-0" title={`Road Tax: Valid until ${new Date(getCustomerDocCategories(customer).taxDoc.endDate).toLocaleDateString('en-IN')}`}>
+                              <StatusBadge
+                                status={getCustomerDocCategories(customer).taxDoc.status}
+                                daysRemaining={getCustomerDocCategories(customer).taxDoc.daysRemaining}
+                                compact
+                              />
+                            </div>
+                          ) : (
+                            <span className="text-slate-300 dark:text-slate-600 text-xs font-mono select-none pl-2">—</span>
+                          )}
+                        </div>
+                      )}
+                    </td>
+
+                    {/* Other / Custom */}
+                    <td className="px-4 py-4 whitespace-nowrap align-top">
+                      {customer.vehicles && customer.vehicles.length > 0 ? (
+                        <div className="flex flex-col gap-2">
+                          {customer.vehicles.map((v) => {
+                            const { otherDocs } = getVehicleDocCategories(v);
+                            return (
+                              <div key={v.id} className="flex items-center h-8 whitespace-nowrap">
+                                {otherDocs && otherDocs.length > 0 ? (
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    {otherDocs.map((doc: any) => (
+                                      <div
+                                        key={doc.id || doc.documentName}
+                                        className="inline-flex items-center gap-1 shrink-0"
+                                        title={`${doc.documentName}: Valid until ${new Date(doc.endDate).toLocaleDateString('en-IN')}`}
+                                      >
+                                        <StatusBadge status={doc.status} daysRemaining={doc.daysRemaining} compact />
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <span className="text-slate-300 dark:text-slate-600 text-xs font-mono select-none pl-2">—</span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="flex items-center h-8 whitespace-nowrap">
+                          {getCustomerDocCategories(customer).otherDocs?.length > 0 ? (
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {getCustomerDocCategories(customer).otherDocs.map((doc: any) => (
+                                <div
+                                  key={doc.id || doc.documentName}
+                                  className="inline-flex items-center gap-1 shrink-0"
+                                  title={`${doc.documentName}: Valid until ${new Date(doc.endDate).toLocaleDateString('en-IN')}`}
+                                >
+                                  <StatusBadge status={doc.status} daysRemaining={doc.daysRemaining} compact />
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-slate-300 dark:text-slate-600 text-xs font-mono select-none pl-2">—</span>
+                          )}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-right text-sm font-medium align-top">
+                      <div className="flex items-center justify-end gap-3 h-8">
                         <Link
                           to={`/customers/${customer.id}`}
                           className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300"
@@ -354,7 +579,11 @@ export default function CustomerListPage() {
                     </td>
                   </tr>
                 );
-              })
+              })}
+                {bottomSpacerHeight > 0 && (
+                  <tr style={{ height: bottomSpacerHeight, border: 0 }}><td colSpan={8} style={{ height: bottomSpacerHeight, padding: 0, border: 0 }} /></tr>
+                )}
+              </>
               )}
             </tbody>
           </table>

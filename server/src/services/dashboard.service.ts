@@ -1,11 +1,23 @@
 import { prisma } from '../lib/prisma.js';
 import { getDaysRemaining } from '../utils/dateHelpers.js';
 
+let statsCache: { data: any; timestamp: number } | null = null;
+const STATS_CACHE_TTL_MS = 20_000; // 20 seconds TTL
+
+export function invalidateDashboardStatsCache() {
+  statsCache = null;
+}
+
 export class DashboardService {
   /**
-   * Get real-time dashboard statistics from PostgreSQL.
+   * Get real-time dashboard statistics with smart in-memory caching.
    */
   static async getStats() {
+    const now = Date.now();
+    if (statsCache && now - statsCache.timestamp < STATS_CACHE_TTL_MS) {
+      return statsCache.data;
+    }
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -108,7 +120,7 @@ export class DashboardService {
       }),
     ]);
 
-    return {
+    const result = {
       totalCustomers,
       totalDocuments,
       expiringSoonCount,
@@ -120,6 +132,9 @@ export class DashboardService {
       pendingNotifications,
       failedNotifications,
     };
+
+    statsCache = { data: result, timestamp: now };
+    return result;
   }
 
   /**

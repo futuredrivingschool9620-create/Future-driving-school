@@ -7,6 +7,7 @@ import { SSEService } from './sse.service.js';
 import { WhatsAppService } from './whatsapp.service.js';
 import { env } from '../config/env.js';
 import { getDaysRemaining, getReminderType, getTodayIST, formatDateIN } from '../utils/dateHelpers.js';
+import { invalidateDashboardStatsCache } from './dashboard.service.js';
 
 export class DocumentService {
   /**
@@ -65,6 +66,7 @@ export class DocumentService {
       ipAddress,
     });
 
+    invalidateDashboardStatsCache();
     SSEService.broadcast({ type: 'DOCUMENT_UPDATE', data: { documentId: document.id, customerId: document.customerId } });
 
     return DocumentStatusService.enrichDocumentWithStatus(document);
@@ -155,6 +157,7 @@ export class DocumentService {
       ipAddress,
     });
 
+    invalidateDashboardStatsCache();
     SSEService.broadcast({ type: 'DOCUMENT_UPDATE', data: { documentId: id } });
 
     return DocumentStatusService.enrichDocumentWithStatus(updated);
@@ -252,6 +255,7 @@ export class DocumentService {
       ipAddress,
     });
 
+    invalidateDashboardStatsCache();
     SSEService.broadcast({ type: 'DOCUMENT_UPDATE', data: { documentId: id } });
 
     return DocumentStatusService.enrichDocumentWithStatus(result);
@@ -296,6 +300,7 @@ export class DocumentService {
       ipAddress,
     });
 
+    invalidateDashboardStatsCache();
     SSEService.broadcast({ type: 'DOCUMENT_UPDATE', data: { documentId: id } });
 
     return { message: 'Document deleted successfully' };
@@ -379,37 +384,81 @@ export class DocumentService {
       }
     }
 
-    const documents = await prisma.document.findMany({
-      where,
-      include: {
-        customer: {
-          select: { id: true, firstName: true, secondName: true, phoneNumber: true, vehicleNumber: true, remarks: true },
-        },
-        vehicle: {
-          select: { id: true, vehicleNumber: true, vehicleType: true, status: true, isActive: true },
-        },
-      },
-      orderBy: { endDate: 'asc' },
-    });
+    // Map computed status directly to SQL endDate range for instant indexed scans
+    if (params.status) {
+      const today = getTodayIST();
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
 
-    // Enrich with computed status
-    let enriched = documents.map((doc) => ({
+      const day8 = new Date(today);
+      day8.setDate(day8.getDate() + 8);
+
+      const day16 = new Date(today);
+      day16.setDate(day16.getDate() + 16);
+
+      const day31 = new Date(today);
+      day31.setDate(day31.getDate() + 31);
+
+      let statusEndDateFilter: Record<string, Date> | undefined;
+
+      switch (params.status) {
+        case 'EXPIRED':
+          statusEndDateFilter = { lt: today };
+          break;
+        case 'EXPIRES_TODAY':
+          statusEndDateFilter = { gte: today, lt: tomorrow };
+          break;
+        case 'CRITICAL':
+          statusEndDateFilter = { gte: tomorrow, lt: day8 };
+          break;
+        case 'DUE_SOON':
+          statusEndDateFilter = { gte: day8, lt: day16 };
+          break;
+        case 'UPCOMING':
+          statusEndDateFilter = { gte: day16, lt: day31 };
+          break;
+        case 'ACTIVE':
+          statusEndDateFilter = { gte: day31 };
+          break;
+      }
+
+      if (statusEndDateFilter) {
+        if (where.endDate) {
+          where.endDate = { ...(where.endDate as object), ...statusEndDateFilter };
+        } else {
+          where.endDate = statusEndDateFilter;
+        }
+      }
+    }
+
+    // Direct database pagination and count — never load 250k records into memory
+    const [documents, total] = await Promise.all([
+      prisma.document.findMany({
+        where,
+        include: {
+          customer: {
+            select: { id: true, firstName: true, secondName: true, phoneNumber: true, vehicleNumber: true, remarks: true },
+          },
+          vehicle: {
+            select: { id: true, vehicleNumber: true, vehicleType: true, status: true, isActive: true },
+          },
+        },
+        orderBy: { endDate: 'asc' },
+        skip,
+        take: limit,
+      }),
+      prisma.document.count({ where }),
+    ]);
+
+    // Enrich only the requested page slice
+    const enriched = documents.map((doc) => ({
       ...DocumentStatusService.enrichDocumentWithStatus(doc),
       customer: doc.customer,
       vehicle: doc.vehicle,
     }));
 
-    // Post-query filter by status (since status is computed, not stored)
-    if (params.status) {
-      enriched = enriched.filter((doc) => doc.status === params.status);
-    }
-
-    // Manual pagination after status filtering
-    const total = enriched.length;
-    const paginatedData = enriched.slice(skip, skip + limit);
-
     return {
-      data: paginatedData,
+      data: enriched,
       pagination: {
         page,
         limit,

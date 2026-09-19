@@ -61,26 +61,59 @@ export class CustomerBatchService {
   static async previewFromPdf(buffer: Buffer, fileName: string): Promise<BatchPreviewResult> {
     const rawRecords = await PdfParserService.parsePdf(buffer);
 
-    // Fetch active customers to check for duplicates
-    const existingCustomers = await prisma.customer.findMany({
-      where: { isActive: true },
-      select: {
-        id: true,
-        firstName: true,
-        secondName: true,
-        phoneNumber: true,
-        vehicleNumber: true,
-        vehicles: {
-          where: { isActive: true },
-          select: { vehicleNumber: true },
-        },
-        drivingLicenceNumber: true,
-        documents: {
-          where: { isActive: true },
-          select: { documentName: true, notes: true },
-        },
-      },
-    });
+    const batchPhones = Array.from(new Set(
+      rawRecords
+        .flatMap((r) => [r.phoneNumber?.replace(/\D/g, ''), r.phoneNumber?.trim()])
+        .filter((p): p is string => Boolean(p))
+    ));
+    const batchVehicles = Array.from(new Set(
+      rawRecords
+        .flatMap((r) => [
+          r.vehicleNumber?.replace(/[\s\-]/g, '').toUpperCase(),
+          r.vehicleNumber?.trim().toUpperCase(),
+        ])
+        .filter((v): v is string => Boolean(v))
+    ));
+    const batchDls = Array.from(new Set(
+      rawRecords
+        .map((r) => r.drivingLicenceNumber?.trim())
+        .filter((dl): dl is string => Boolean(dl))
+    ));
+
+    // Targeted query for only customers matching incoming batch identifiers — never scan 250k records
+    const existingCustomers = (batchPhones.length > 0 || batchVehicles.length > 0 || batchDls.length > 0)
+      ? await prisma.customer.findMany({
+          where: {
+            isActive: true,
+            OR: [
+              ...(batchPhones.length > 0 ? [{ phoneNumber: { in: batchPhones } }] : []),
+              ...(batchVehicles.length > 0
+                ? [
+                    { vehicleNumber: { in: batchVehicles } },
+                    { vehicles: { some: { isActive: true, vehicleNumber: { in: batchVehicles } } } },
+                  ]
+                : []),
+              ...(batchDls.length > 0 ? [{ drivingLicenceNumber: { in: batchDls } }] : []),
+            ],
+          },
+          select: {
+            id: true,
+            firstName: true,
+            secondName: true,
+            phoneNumber: true,
+            vehicleNumber: true,
+            vehicles: {
+              where: { isActive: true },
+              select: { vehicleNumber: true },
+            },
+            drivingLicenceNumber: true,
+            documents: {
+              where: { isActive: true },
+              select: { documentName: true, notes: true },
+            },
+          },
+        })
+      : [];
 
     const evaluatedRecords: EvaluatedCustomerRecord[] = [];
     const seenPhonesInBatch = new Set<string>();

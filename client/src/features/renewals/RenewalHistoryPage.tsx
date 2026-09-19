@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { renewalApi } from '../../lib/api';
 import type { RenewalHistory } from '../../types';
+import { useVirtualTable } from '../../hooks/useVirtualTable';
 
 export default function RenewalHistoryPage() {
   const [searchParams] = useSearchParams();
@@ -12,6 +13,11 @@ export default function RenewalHistoryPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
+
+  const { containerRef, visibleItems, topSpacerHeight, bottomSpacerHeight } = useVirtualTable({
+    items: renewals,
+    estimatedRowHeight: 64,
+  });
 
   const fetchRenewals = useCallback(async () => {
     try {
@@ -48,7 +54,7 @@ export default function RenewalHistoryPage() {
 
       {/* Table */}
       <div className="glass-card overflow-hidden">
-        <div className="overflow-x-auto">
+        <div ref={containerRef} className="overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
             <thead className="bg-slate-50/50 dark:bg-slate-800/50">
               <tr>
@@ -90,47 +96,51 @@ export default function RenewalHistoryPage() {
                   </td>
                 </tr>
               ) : (
-                renewals.map((r) => (
-                  <tr key={r.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/80 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="font-semibold text-sm text-slate-900 dark:text-white">
-                        {r.customer ? `${r.customer.firstName} ${r.customer.secondName}` : 'Customer'}
-                      </div>
-                      <div className="text-xs text-slate-500 font-mono mt-0.5">
-                        {r.customer?.vehicleNumber}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="font-semibold text-sm text-indigo-600 dark:text-indigo-400">
-                        {r.oldDocumentName}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-xs text-slate-500">
-                      {new Date(r.oldStartDate).toLocaleDateString('en-IN')} &rarr;{' '}
-                      <span className="line-through text-red-400">
-                        {new Date(r.oldEndDate).toLocaleDateString('en-IN')}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-xs text-slate-900 dark:text-slate-200">
-                      {new Date(r.newStartDate).toLocaleDateString('en-IN')} &rarr;{' '}
-                      <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                        {new Date(r.newEndDate).toLocaleDateString('en-IN')}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-xs text-slate-500">
-                      <div className="font-medium text-slate-700 dark:text-slate-300">
-                        Admin: {r.admin?.username || 'admin'}
-                      </div>
-                      <div className="text-slate-400 mt-0.5">
-                        {new Date(r.renewalDate).toLocaleDateString('en-IN', {
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric',
-                        })}
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                <>
+                  {topSpacerHeight > 0 && (
+                    <tr style={{ height: topSpacerHeight, border: 0 }}><td colSpan={5} style={{ height: topSpacerHeight, padding: 0, border: 0 }} /></tr>
+                  )}
+                  {visibleItems.map(({ item: r }) => (
+                    <tr key={r.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/80 transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="font-semibold text-sm text-slate-900 dark:text-white">
+                          {r.customer ? `${r.customer.firstName} ${r.customer.secondName}` : 'Customer'}
+                        </div>
+                        <div className="text-xs text-slate-500 font-mono mt-0.5">
+                          {r.customer?.vehicleNumber}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="font-semibold text-sm text-indigo-600 dark:text-indigo-400">
+                          {r.oldDocumentName}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-xs text-slate-500">
+                        {new Date(r.oldStartDate).toLocaleDateString('en-IN')} &rarr;{' '}
+                        <span className="line-through text-red-400">
+                          {new Date(r.oldEndDate).toLocaleDateString('en-IN')}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-xs text-slate-900 dark:text-slate-200">
+                        {new Date(r.newStartDate).toLocaleDateString('en-IN')} &rarr;{' '}
+                        <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                          {new Date(r.newEndDate).toLocaleDateString('en-IN')}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-xs text-slate-600 dark:text-slate-400">
+                        <div className="font-semibold text-slate-900 dark:text-white">
+                          {r.admin?.username || 'Admin'}
+                        </div>
+                        <div className="text-[11px] text-slate-400 mt-0.5">
+                          {new Date(r.renewalDate).toLocaleString('en-IN')}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {bottomSpacerHeight > 0 && (
+                    <tr style={{ height: bottomSpacerHeight, border: 0 }}><td colSpan={5} style={{ height: bottomSpacerHeight, padding: 0, border: 0 }} /></tr>
+                  )}
+                </>
               )}
             </tbody>
           </table>

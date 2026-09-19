@@ -5,6 +5,7 @@ import { DocumentStatusService } from './documentStatus.service.js';
 import { VehicleService } from './vehicle.service.js';
 import { type CreateCustomerInput, type UpdateCustomerInput, validateAndFormatVehicleNumber } from '../validators/customer.schema.js';
 import { SSEService } from './sse.service.js';
+import { invalidateDashboardStatsCache } from './dashboard.service.js';
 
 function formatFullName(firstName: string, secondName?: string | null): string {
   return [firstName, secondName].filter(Boolean).join(' ').trim() || firstName;
@@ -198,6 +199,7 @@ export class CustomerService {
       ipAddress,
     });
 
+    invalidateDashboardStatsCache();
     SSEService.broadcast({ type: 'CUSTOMER_UPDATE', data: { customerId: customer.id } });
 
     return CustomerService.getById(customer.id);
@@ -263,6 +265,7 @@ export class CustomerService {
       ipAddress,
     });
 
+    invalidateDashboardStatsCache();
     SSEService.broadcast({ type: 'CUSTOMER_UPDATE', data: { customerId: id } });
 
     return {
@@ -324,6 +327,7 @@ export class CustomerService {
       ipAddress,
     });
 
+    invalidateDashboardStatsCache();
     SSEService.broadcast({ type: 'CUSTOMER_UPDATE', data: { customerId: id } });
 
     return { message: 'Customer and all associated vehicles and documents deleted successfully' };

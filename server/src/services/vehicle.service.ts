@@ -3,6 +3,7 @@ import { NotFoundError, BadRequestError } from '../utils/errors.js';
 import { AuditService } from './audit.service.js';
 import { DocumentStatusService } from './documentStatus.service.js';
 import { SSEService } from './sse.service.js';
+import { invalidateDashboardStatsCache } from './dashboard.service.js';
 import type { CreateVehicleInput, UpdateVehicleInput, UpdateVehicleStatusInput } from '../validators/vehicle.schema.js';
 
 export class VehicleService {
@@ -137,6 +138,7 @@ export class VehicleService {
         ipAddress,
       });
 
+      invalidateDashboardStatsCache();
       SSEService.broadcast({ type: 'CUSTOMER_UPDATE', data: { customerId } });
       SSEService.broadcast({ type: 'DOCUMENT_UPDATE', data: { customerId } });
     }
@@ -272,6 +274,7 @@ export class VehicleService {
       ipAddress,
     });
 
+    invalidateDashboardStatsCache();
     SSEService.broadcast({ type: 'CUSTOMER_UPDATE', data: { customerId: existing.customerId } });
 
     return {
@@ -317,6 +320,7 @@ export class VehicleService {
       ipAddress,
     });
 
+    invalidateDashboardStatsCache();
     SSEService.broadcast({ type: 'CUSTOMER_UPDATE', data: { customerId: existing.customerId } });
 
     return {
@@ -372,6 +376,7 @@ export class VehicleService {
       ipAddress,
     });
 
+    invalidateDashboardStatsCache();
     SSEService.broadcast({ type: 'CUSTOMER_UPDATE', data: { customerId: existing.customerId } });
     SSEService.broadcast({ type: 'DOCUMENT_UPDATE', data: { customerId: existing.customerId } });
 
@@ -427,6 +432,7 @@ export class VehicleService {
       ipAddress,
     });
 
+    invalidateDashboardStatsCache();
     SSEService.broadcast({ type: 'DOCUMENT_UPDATE', data: { documentId: document.id, customerId: vehicle.customerId } });
 
     return DocumentStatusService.enrichDocumentWithStatus(document);
