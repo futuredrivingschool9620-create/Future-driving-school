@@ -1,4 +1,5 @@
 export interface AppUpdateMetadata {
+  buildId?: string;
   latestVersion: string;
   releaseDate: string;
   releaseNotes: string[];
@@ -111,9 +112,11 @@ export class UpdateService {
 
     const currentVer = clientVersion || currentUpdateInfo.latestVersion;
     const hasUpdate = this.compareVersions(currentUpdateInfo.latestVersion, currentVer) > 0;
+    const buildId = process.env.VERCEL_GIT_COMMIT_SHA || process.env.VERCEL_DEPLOYMENT_ID || '1.3.0';
 
     return {
       ...currentUpdateInfo,
+      buildId,
       currentVersion: currentVer,
       hasUpdate,
     };

@@ -55,13 +55,25 @@ export default function SettingsPage() {
     }
   };
 
-  const handleDownloadApp = () => {
-    if (!versionInfo?.downloadUrl) return;
-    if (window.electronAPI?.openExternalUrl) {
-      window.electronAPI.openExternalUrl(versionInfo.downloadUrl);
-    } else {
-      window.open(versionInfo.downloadUrl, '_blank');
+  const handleUpdateNow = async () => {
+    if ('serviceWorker' in navigator) {
+      try {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map((reg) => reg.unregister()));
+      } catch {}
     }
+    if ('caches' in window) {
+      try {
+        const cacheNames = await caches.keys();
+        await Promise.all(cacheNames.map((name) => caches.delete(name)));
+      } catch {}
+    }
+    try {
+      sessionStorage.removeItem('dismissed_update_build_id');
+    } catch {}
+    const url = new URL(window.location.href);
+    url.searchParams.set('_v', Date.now().toString());
+    window.location.href = url.toString();
   };
 
   const handleChangePassword = async (e: FormEvent) => {
@@ -244,13 +256,13 @@ export default function SettingsPage() {
 
           {versionInfo?.hasUpdate && (
             <button
-              onClick={handleDownloadApp}
+              onClick={handleUpdateNow}
               className="w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs font-semibold text-white bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 shadow-md shadow-teal-500/20 transition-all cursor-pointer flex items-center justify-center gap-2"
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
-              <span>Download & Install v{versionInfo.latestVersion} (.exe)</span>
+              <span>Update & Reload Website Now</span>
             </button>
           )}
         </div>

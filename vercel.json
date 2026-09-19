@@ -13,6 +13,16 @@
       "schedule": "0 4 * * *"
     }
   ],
+  "headers": [
+    {
+      "source": "/(index\\.html|version\\.json)",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" },
+        { "key": "Pragma", "value": "no-cache" },
+        { "key": "Expires", "value": "0" }
+      ]
+    }
+  ],
   "rewrites": [
     { "source": "/api/cron/(.*)", "destination": "/api/cron/$1" },
     { "source": "/api/(.*)", "destination": "/api" },

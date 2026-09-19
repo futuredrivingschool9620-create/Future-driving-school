@@ -1,12 +1,8 @@
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import logoImg from '../../preset/WhatsApp.jpeg';
-import { appApi } from '../../lib/api';
-import type { AppVersionInfo } from '../../types';
 import { UpdateBanner } from '../shared/UpdateBanner';
-import { UpdateModal } from '../shared/UpdateModal';
-import { CURRENT_APP_VERSION } from '../../config/version';
 
 const navItems = [
   {
@@ -89,61 +85,104 @@ export default function AuthenticatedLayout() {
   const location = useLocation();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-  // App Update State
-  const [updateInfo, setUpdateInfo] = useState<AppVersionInfo | null>(null);
-  const [showBanner, setShowBanner] = useState(false);
-  const [showModal, setShowModal] = useState(false);
+  // Web Deployment Update State
+  const [showUpdateBanner, setShowUpdateBanner] = useState(false);
+  const [latestBuildId, setLatestBuildId] = useState<string | null>(null);
 
-  useEffect(() => {
-    let isMounted = true;
-    const checkVersion = async () => {
-      try {
-        const clientVer = window.electronAPI?.appVersion || CURRENT_APP_VERSION;
-        const info = await appApi.getVersionInfo(clientVer);
-        if (!isMounted) return;
+  const checkForUpdates = useCallback(async () => {
+    try {
+      // Fetch version.json directly with cache-busting timestamp
+      const res = await fetch(`/version.json?_t=${Date.now()}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          Pragma: 'no-cache',
+        },
+      });
 
-        setUpdateInfo(info);
+      if (!res.ok) return;
 
-        if (info.hasUpdate) {
-          const dismissedVer = localStorage.getItem('dismissed_update_version');
-          const dismissedTime = localStorage.getItem('dismissed_update_time');
-          const isDismissedRecently =
-            dismissedVer === info.latestVersion &&
-            dismissedTime &&
-            Date.now() - parseInt(dismissedTime, 10) < 24 * 60 * 60 * 1000;
+      const data = await res.json();
+      const serverBuildId = data?.buildId;
 
-          if (!isDismissedRecently || info.mandatory) {
-            setShowBanner(true);
-          }
+      // Current client build id injected at build time by Vite
+      const currentBuildId = typeof __APP_BUILD_ID__ !== 'undefined' ? __APP_BUILD_ID__ : 'dev';
+
+      if (serverBuildId && serverBuildId !== 'dev' && serverBuildId !== currentBuildId) {
+        setLatestBuildId(serverBuildId);
+
+        // Check if user already clicked "Later" for THIS specific build during current session
+        const dismissedBuildId = sessionStorage.getItem('dismissed_update_build_id');
+        if (dismissedBuildId !== serverBuildId) {
+          setShowUpdateBanner(true);
         }
-      } catch {
-        // Non-fatal
       }
-    };
-
-    checkVersion();
-    const interval = setInterval(checkVersion, 6 * 60 * 60 * 1000);
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
+    } catch {
+      // Silent failure - do not interrupt user
+    }
   }, []);
 
-  const handleDownloadUpdate = () => {
-    if (!updateInfo?.downloadUrl) return;
-    if (window.electronAPI?.openExternalUrl) {
-      window.electronAPI.openExternalUrl(updateInfo.downloadUrl);
-    } else {
-      window.open(updateInfo.downloadUrl, '_blank');
+  useEffect(() => {
+    checkForUpdates();
+
+    // Periodic check every 60 seconds
+    const interval = setInterval(checkForUpdates, 60 * 1000);
+
+    // Check when user switches back to this tab
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        checkForUpdates();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [checkForUpdates]);
+
+  const handleUpdateNow = async () => {
+    // 1. Unregister any service workers safely
+    if ('serviceWorker' in navigator) {
+      try {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map((reg) => reg.unregister()));
+      } catch {
+        // ignore
+      }
     }
+
+    // 2. Clear browser CacheStorage (HTTP cache from service workers)
+    // NOTE: This does NOT delete localStorage, sessionStorage, or cookies!
+    // Customer data, vehicle data, login session, tokens are 100% preserved.
+    if ('caches' in window) {
+      try {
+        const cacheNames = await caches.keys();
+        await Promise.all(cacheNames.map((name) => caches.delete(name)));
+      } catch {
+        // ignore
+      }
+    }
+
+    // 3. Clear dismissed build id from sessionStorage since we are updating now
+    try {
+      sessionStorage.removeItem('dismissed_update_build_id');
+    } catch {}
+
+    // 4. Force reload the latest deployment by adding a timestamp query to bust browser cache
+    const url = new URL(window.location.href);
+    url.searchParams.set('_v', Date.now().toString());
+    window.location.href = url.toString();
   };
 
-  const handleDismissBanner = () => {
-    if (updateInfo) {
-      localStorage.setItem('dismissed_update_version', updateInfo.latestVersion);
-      localStorage.setItem('dismissed_update_time', Date.now().toString());
+  const handleLater = () => {
+    if (latestBuildId) {
+      try {
+        sessionStorage.setItem('dismissed_update_build_id', latestBuildId);
+      } catch {}
     }
-    setShowBanner(false);
+    setShowUpdateBanner(false);
   };
 
   const getPageTitle = () => {
@@ -274,31 +313,14 @@ export default function AuthenticatedLayout() {
                 })}
               </p>
             </div>
-            <div className="flex items-center gap-3">
-              {updateInfo?.hasUpdate && (
-                <button
-                  onClick={() => setShowModal(true)}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold bg-teal-500/15 text-teal-300 border border-teal-500/30 hover:bg-teal-500/25 transition-all shadow-sm cursor-pointer"
-                  title="Click to view update details"
-                >
-                  <span className="flex h-2 w-2 relative">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-teal-500"></span>
-                  </span>
-                  <span>Update v{updateInfo.latestVersion} Available</span>
-                </button>
-              )}
-            </div>
           </div>
         </header>
 
-        {/* In-App Update Announcement Banner */}
-        {showBanner && (
+        {/* In-App Update Notification Banner */}
+        {showUpdateBanner && (
           <UpdateBanner
-            updateInfo={updateInfo}
-            onOpenDetails={() => setShowModal(true)}
-            onDownload={handleDownloadUpdate}
-            onDismiss={handleDismissBanner}
+            onUpdateNow={handleUpdateNow}
+            onLater={handleLater}
           />
         )}
 
@@ -306,14 +328,6 @@ export default function AuthenticatedLayout() {
         <div className="p-4 md:p-8 page-enter">
           <Outlet />
         </div>
-
-        {/* What's New / Update Modal */}
-        <UpdateModal
-          isOpen={showModal}
-          onClose={() => setShowModal(false)}
-          updateInfo={updateInfo}
-          onDownload={handleDownloadUpdate}
-        />
       </main>
     </div>
   );
