@@ -27,7 +27,14 @@ export function useSSE(onEvent: (event: SSEEvent) => void) {
 
     // We can pass token in URL since EventSource doesn't support custom headers easily,
     // or if the backend relies on cookies.
-    const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+    const API_BASE =
+      typeof window !== 'undefined' &&
+      (window.electronAPI?.isElectron ||
+        window.location.protocol === 'file:' ||
+        !window.location.origin ||
+        window.location.origin === 'null')
+        ? 'http://localhost:3001/api'
+        : import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
     const eventSource = new EventSource(`${API_BASE}/events?token=${token}`, {
       withCredentials: true,
     });

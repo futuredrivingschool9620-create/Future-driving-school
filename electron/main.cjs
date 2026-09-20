@@ -88,6 +88,53 @@ function waitForServer(callback, maxAttempts = 30) {
   check();
 }
 
+let appConfig = {
+  liveUrl: '',
+  fallbackToLocal: true,
+};
+
+try {
+  const configPath = path.join(__dirname, 'config.json');
+  if (fs.existsSync(configPath)) {
+    const raw = fs.readFileSync(configPath, 'utf8');
+    appConfig = { ...appConfig, ...JSON.parse(raw) };
+  }
+} catch (e) {
+  console.warn('[Electron] Could not read config.json, using defaults:', e.message);
+}
+
+function loadAppContent() {
+  if (!mainWindow) return;
+  const updateDir = path.join(app.getPath('userData'), 'update');
+  const updateVersionJson = path.join(updateDir, 'version.json');
+  const packagedVersionJson = path.join(__dirname, '..', 'client', 'dist', 'version.json');
+
+  let useUpdate = false;
+  if (fs.existsSync(updateVersionJson) && fs.existsSync(packagedVersionJson)) {
+    try {
+      const updateVer = JSON.parse(fs.readFileSync(updateVersionJson, 'utf8'));
+      const packagedVer = JSON.parse(fs.readFileSync(packagedVersionJson, 'utf8'));
+      if (
+        updateVer.buildTime &&
+        packagedVer.buildTime &&
+        new Date(updateVer.buildTime).getTime() > new Date(packagedVer.buildTime).getTime()
+      ) {
+        useUpdate = true;
+      }
+    } catch {}
+  }
+
+  const updateIndexPath = path.join(updateDir, 'index.html');
+  if (useUpdate && fs.existsSync(updateIndexPath)) {
+    console.log('[Electron] Loading updated in-app bundle from:', updateIndexPath);
+    mainWindow.loadFile(updateIndexPath);
+  } else {
+    const defaultIndexPath = path.join(__dirname, '..', 'client', 'dist', 'index.html');
+    console.log('[Electron] Loading packaged app bundle from:', defaultIndexPath);
+    mainWindow.loadFile(defaultIndexPath);
+  }
+}
+
 function createWindow() {
   const appIcon = path.join(__dirname, 'icon.png');
   mainWindow = new BrowserWindow({
@@ -104,7 +151,7 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
       contextIsolation: true,
-      sandbox: true,
+      webSecurity: false,
     },
   });
 
@@ -137,10 +184,20 @@ function createWindow() {
     console.log(`[Renderer]: ${message}`);
   });
 
+  const liveUrl = process.env.LIVE_APP_URL || (appConfig.liveUrl && appConfig.liveUrl.trim() !== '' ? appConfig.liveUrl.trim() : null);
+
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173');
+  } else if (liveUrl) {
+    console.log('[Electron] Connecting to live cloud application:', liveUrl);
+    mainWindow.loadURL(liveUrl).catch((err) => {
+      console.warn('[Electron] Could not load live URL, falling back to local files:', err.message);
+      if (appConfig.fallbackToLocal) {
+        loadAppContent();
+      }
+    });
   } else {
-    mainWindow.loadFile(path.join(__dirname, '..', 'client', 'dist', 'index.html'));
+    loadAppContent();
   }
 
   mainWindow.on('closed', () => {
@@ -177,6 +234,65 @@ ipcMain.on('open-external-url', (_event, url) => {
   }
 });
 
+// Purge cache and reload application on update
+ipcMain.on('app-reload-update', () => {
+  if (mainWindow) {
+    console.log('[Electron] Purging cache and reloading application...');
+    mainWindow.webContents.session.clearCache().then(() => {
+      loadAppContent();
+    });
+  }
+});
+
+// Download and apply in-app hot update bundle without downloading or running a new .exe
+ipcMain.handle('apply-in-app-update', async (_event, updateUrl) => {
+  try {
+    if (!updateUrl) throw new Error('No update URL provided');
+    console.log('[Electron] Downloading in-app update bundle from:', updateUrl);
+
+    const updateDir = path.join(app.getPath('userData'), 'update');
+    const zipPath = path.join(app.getPath('userData'), 'update-bundle.zip');
+
+    const res = await fetch(updateUrl);
+    if (!res.ok) throw new Error(`Download failed: HTTP ${res.status}`);
+    const buffer = Buffer.from(await res.arrayBuffer());
+    fs.writeFileSync(zipPath, buffer);
+
+    if (!fs.existsSync(updateDir)) {
+      fs.mkdirSync(updateDir, { recursive: true });
+    }
+
+    // Unpack on Windows via PowerShell Expand-Archive
+    await new Promise((resolve, reject) => {
+      const ps = spawn('powershell.exe', [
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        `Expand-Archive -Path '${zipPath}' -DestinationPath '${updateDir}' -Force`
+      ]);
+      ps.on('close', (code) => {
+        if (code === 0) resolve();
+        else reject(new Error(`Extraction failed with code ${code}`));
+      });
+      ps.on('error', reject);
+    });
+
+    try { fs.unlinkSync(zipPath); } catch {}
+
+    const updateIndex = path.join(updateDir, 'index.html');
+    if (fs.existsSync(updateIndex) && mainWindow) {
+      console.log('[Electron] In-app update extracted successfully! Reloading...');
+      mainWindow.webContents.session.clearCache().then(() => {
+        mainWindow.loadFile(updateIndex);
+      });
+    }
+    return { success: true };
+  } catch (err) {
+    console.error('[Electron] Error applying in-app update:', err);
+    return { success: false, error: err.message };
+  }
+});
+
 app.whenReady().then(() => {
   startServer();
   waitForServer(() => {
@@ -190,17 +306,29 @@ app.whenReady().then(() => {
   });
 });
 
-app.on('window-all-closed', () => {
-  if (serverProcess) {
-    serverProcess.kill();
+function killServer() {
+  if (serverProcess && serverProcess.pid) {
+    try {
+      if (process.platform === 'win32') {
+        spawn('taskkill', ['/pid', serverProcess.pid.toString(), '/T', '/F']);
+      } else {
+        serverProcess.kill('SIGTERM');
+      }
+    } catch (e) {
+      console.error('Error killing server process:', e);
+    }
+    serverProcess = null;
   }
+}
+
+app.on('window-all-closed', () => {
+  killServer();
   if (process.platform !== 'darwin') {
     app.quit();
   }
 });
 
 app.on('before-quit', () => {
-  if (serverProcess) {
-    serverProcess.kill();
-  }
+  killServer();
 });
+

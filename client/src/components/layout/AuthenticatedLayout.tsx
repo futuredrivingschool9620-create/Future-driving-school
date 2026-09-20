@@ -1,8 +1,9 @@
-import { Outlet, NavLink, useLocation } from 'react-router-dom';
+import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useState, useEffect, useCallback } from 'react';
 import logoImg from '../../preset/WhatsApp.jpeg';
 import { UpdateBanner } from '../shared/UpdateBanner';
+import { appApi } from '../../lib/api';
 
 const navItems = [
   {
@@ -80,55 +81,97 @@ const navItems = [
   },
 ];
 
+const CURRENT_APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.3.0';
+
 export default function AuthenticatedLayout() {
   const { admin } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const savedVersion = typeof window !== 'undefined' ? sessionStorage.getItem('installed_override_version') : null;
+  const clientVersion = savedVersion || CURRENT_APP_VERSION || window.electronAPI?.appVersion || '1.3.0';
 
-  // Web Deployment Update State
+  // Application Update State
   const [showUpdateBanner, setShowUpdateBanner] = useState(false);
-  const [latestBuildId, setLatestBuildId] = useState<string | null>(null);
+  const [hasUpdate, setHasUpdate] = useState(false);
+  const [latestVersion, setLatestVersion] = useState<string | null>(null);
+
+  const compareVersions = (v1: string, v2: string): number => {
+    const c = (v: string) => v.replace(/^v/i, '').split('.').map((n) => parseInt(n, 10) || 0);
+    const p1 = c(v1);
+    const p2 = c(v2);
+    for (let i = 0; i < Math.max(p1.length, p2.length); i++) {
+      const n1 = p1[i] || 0;
+      const n2 = p2[i] || 0;
+      if (n1 > n2) return 1;
+      if (n1 < n2) return -1;
+    }
+    return 0;
+  };
+
+  const CLOUD_MANIFEST_URL = 'https://raw.githubusercontent.com/futuredrivingschool9620-create/Future-driving-school/main/version-manifest.json';
 
   const checkForUpdates = useCallback(async () => {
     try {
-      // Fetch version.json directly with cache-busting timestamp
-      const res = await fetch(`/version.json?_t=${Date.now()}`, {
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          Pragma: 'no-cache',
-        },
-      });
+      const [apiInfo, versionRes, cloudRes, ghRes] = await Promise.allSettled([
+        appApi.getVersionInfo(clientVersion),
+        fetch(`/version.json?_t=${Date.now()}`, {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            Pragma: 'no-cache',
+          },
+        }),
+        fetch(`${CLOUD_MANIFEST_URL}?_t=${Date.now()}`, { cache: 'no-store' }),
+        fetch('https://api.github.com/repos/futuredrivingschool9620-create/Future-driving-school/releases/latest', {
+          headers: { Accept: 'application/vnd.github.v3+json' },
+        }),
+      ]);
 
-      if (!res.ok) return;
+      let webData: any = null;
+      if (versionRes.status === 'fulfilled' && versionRes.value.ok) {
+        try { webData = await versionRes.value.json(); } catch {}
+      }
 
-      const data = await res.json();
-      const serverBuildId = data?.buildId;
+      let cloudData: any = null;
+      if (cloudRes.status === 'fulfilled' && cloudRes.value.ok) {
+        try { cloudData = await cloudRes.value.json(); } catch {}
+      }
 
-      // Current client build id injected at build time by Vite
-      const currentBuildId = typeof __APP_BUILD_ID__ !== 'undefined' ? __APP_BUILD_ID__ : 'dev';
+      let ghData: any = null;
+      if (ghRes.status === 'fulfilled' && ghRes.value.ok) {
+        try { ghData = await ghRes.value.json(); } catch {}
+      }
 
-      if (serverBuildId && serverBuildId !== 'dev' && serverBuildId !== currentBuildId) {
-        setLatestBuildId(serverBuildId);
+      const serverVersion =
+        (apiInfo.status === 'fulfilled' ? apiInfo.value?.latestVersion : null) ||
+        cloudData?.latestVersion ||
+        (ghData?.tag_name ? ghData.tag_name.replace(/^v/i, '') : null) ||
+        webData?.version;
 
-        // Check if user already clicked "Later" for THIS specific build during current session
-        const dismissedBuildId = sessionStorage.getItem('dismissed_update_build_id');
-        if (dismissedBuildId !== serverBuildId) {
+      if (serverVersion && compareVersions(serverVersion, clientVersion) > 0) {
+        setHasUpdate(true);
+        setLatestVersion(serverVersion);
+
+        const dismissedVer = sessionStorage.getItem('dismissed_update_version');
+        if (dismissedVer !== serverVersion) {
           setShowUpdateBanner(true);
         }
+      } else {
+        setHasUpdate(false);
       }
     } catch {
       // Silent failure - do not interrupt user
     }
-  }, []);
+  }, [clientVersion]);
 
   useEffect(() => {
     checkForUpdates();
 
-    // Periodic check every 60 seconds
-    const interval = setInterval(checkForUpdates, 60 * 1000);
+    // Periodic check every 30 seconds
+    const interval = setInterval(checkForUpdates, 30 * 1000);
 
-    // Check when user switches back to this tab
+    // Check when user switches back to this tab / window
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         checkForUpdates();
@@ -142,48 +185,20 @@ export default function AuthenticatedLayout() {
     };
   }, [checkForUpdates]);
 
-  const handleUpdateNow = async () => {
-    // 1. Unregister any service workers safely
-    if ('serviceWorker' in navigator) {
-      try {
-        const registrations = await navigator.serviceWorker.getRegistrations();
-        await Promise.all(registrations.map((reg) => reg.unregister()));
-      } catch {
-        // ignore
-      }
-    }
-
-    // 2. Clear browser CacheStorage (HTTP cache from service workers)
-    // NOTE: This does NOT delete localStorage, sessionStorage, or cookies!
-    // Customer data, vehicle data, login session, tokens are 100% preserved.
-    if ('caches' in window) {
-      try {
-        const cacheNames = await caches.keys();
-        await Promise.all(cacheNames.map((name) => caches.delete(name)));
-      } catch {
-        // ignore
-      }
-    }
-
-    // 3. Clear dismissed build id from sessionStorage since we are updating now
-    try {
-      sessionStorage.removeItem('dismissed_update_build_id');
-    } catch {}
-
-    // 4. Force reload the latest deployment by adding a timestamp query to bust browser cache
-    const url = new URL(window.location.href);
-    url.searchParams.set('_v', Date.now().toString());
-    window.location.href = url.toString();
+  const handleUpdateNow = () => {
+    setShowUpdateBanner(false);
+    navigate('/settings');
   };
 
   const handleLater = () => {
-    if (latestBuildId) {
+    if (latestVersion) {
       try {
-        sessionStorage.setItem('dismissed_update_build_id', latestBuildId);
+        sessionStorage.setItem('dismissed_update_version', latestVersion);
       } catch {}
     }
     setShowUpdateBanner(false);
   };
+
 
   const getPageTitle = () => {
     if (location.pathname.startsWith('/customers')) {
@@ -284,7 +299,13 @@ export default function AuthenticatedLayout() {
             {!sidebarCollapsed && (
               <div className="flex-1 min-w-0">
                 <p className="text-white text-sm font-medium truncate">{admin?.username}</p>
-                <p className="text-slate-500 text-xs truncate">Administrator</p>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className={`w-1.5 h-1.5 rounded-full ${hasUpdate ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400'}`}></span>
+                  <span className="text-[11px] text-slate-400 font-mono">v{clientVersion}</span>
+                  <span className={`text-[10px] font-medium ${hasUpdate ? 'text-amber-300' : 'text-emerald-400'}`}>
+                    • {hasUpdate ? 'Update available' : 'Up to date'}
+                  </span>
+                </div>
               </div>
             )}
           </div>
@@ -313,12 +334,33 @@ export default function AuthenticatedLayout() {
                 })}
               </p>
             </div>
+
+            {/* Live Version & Status Indicator */}
+            <div className="flex items-center gap-3">
+              <NavLink
+                to="/settings"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold transition-all border shadow-sm group hover:scale-[1.02]"
+                style={{
+                  backgroundColor: hasUpdate ? 'rgba(245, 158, 11, 0.12)' : 'rgba(16, 185, 129, 0.12)',
+                  borderColor: hasUpdate ? 'rgba(245, 158, 11, 0.3)' : 'rgba(16, 185, 129, 0.3)',
+                  color: hasUpdate ? '#fbbf24' : '#34d399',
+                }}
+                title={hasUpdate ? `Update v${latestVersion} available! Click to open Settings` : `Application is up to date (v${clientVersion})`}
+              >
+                <span className={`w-2 h-2 rounded-full ${hasUpdate ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400'}`} />
+                <span className="font-mono">v{clientVersion}</span>
+                <span className="hidden sm:inline text-[11px] opacity-90 font-medium">
+                  {hasUpdate ? `• Update v${latestVersion} Available` : '• Up to date'}
+                </span>
+              </NavLink>
+            </div>
           </div>
         </header>
 
         {/* In-App Update Notification Banner */}
         {showUpdateBanner && (
           <UpdateBanner
+            version={latestVersion || undefined}
             onUpdateNow={handleUpdateNow}
             onLater={handleLater}
           />

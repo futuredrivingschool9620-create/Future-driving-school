@@ -9,4 +9,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   minimizeWindow: () => ipcRenderer.send('window-minimize'),
   maximizeWindow: () => ipcRenderer.send('window-maximize'),
   closeWindow: () => ipcRenderer.send('window-close'),
+  reloadApp: () => ipcRenderer.send('app-reload-update'),
+  applyInAppUpdate: (url) => ipcRenderer.invoke('apply-in-app-update', url),
 });

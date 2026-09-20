@@ -1,0 +1,17 @@
+{
+  "latestVersion": "1.4.0",
+  "releaseDate": "20 September 2026",
+  "releaseNotes": [
+    "✨ Live in-app update system active (instant update without 240 MB installer)",
+    "⚡ Seamless background sync and auto-update deployment across all PCs",
+    "🔔 Instant expiry alerts and WhatsApp notification control",
+    "🚗 Fleet status auto-sync and real-time document compliance",
+    "🛡️ Automatic server port & process lifecycle management"
+  ],
+  "downloadUrl": "https://github.com/futuredrivingschool9620-create/Future-driving-school/releases/download/v1.4.0/Future-Driving-School-Setup-1.4.0.exe",
+  "installerUrl": "https://github.com/futuredrivingschool9620-create/Future-driving-school/releases/download/v1.4.0/Future-Driving-School-Setup-1.4.0.exe",
+  "updateBundleUrl": "https://raw.githubusercontent.com/futuredrivingschool9620-create/Future-driving-school/main/update-bundle.zip",
+  "mandatory": false,
+  "minSupportedVersion": "1.0.0",
+  "buildId": "1.4.0"
+}

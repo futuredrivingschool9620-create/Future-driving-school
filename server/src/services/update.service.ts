@@ -10,25 +10,26 @@ export interface AppUpdateMetadata {
 
 // In-memory / default version metadata (can be updated via API or env vars)
 let currentUpdateInfo: AppUpdateMetadata = {
-  latestVersion: process.env.APP_LATEST_VERSION || '1.3.0',
-  releaseDate: process.env.APP_RELEASE_DATE || '18 September 2026',
+  latestVersion: process.env.APP_LATEST_VERSION || '1.4.0',
+  releaseDate: process.env.APP_RELEASE_DATE || '20 September 2026',
   releaseNotes: [
-    '⚡ Instant WhatsApp reminder triggers directly from Documents and Search tables',
-    '🚗 Automatic vehicle status sync (auto-marks Expired when documents pass due)',
-    '🔔 Overdue cutoff removed — now alerts for all expired documents regardless of age',
-    '🛡️ Duplicate reminder protection — eliminated status 500 alert on repeated sends',
-    '✨ In-app update notifications & automatic version checking',
+    '✨ Live in-app update system active (instant Riot Games style update)',
+    '⚡ Seamless background sync without downloading a 240 MB installer',
+    '🔔 Instant expiry alerts and WhatsApp notification control',
+    '🚗 Fleet status auto-sync and real-time document compliance',
+    '🛡️ Automatic server port & process lifecycle management',
   ],
   downloadUrl:
     process.env.APP_DOWNLOAD_URL ||
-    'https://github.com/futuredrivingschool9620-create/Future-driving-school/releases/latest',
+    '/api/app/update-bundle.zip',
   mandatory: false,
   minSupportedVersion: '1.0.0',
 };
 
+
 // Cached GitHub release info to prevent rate limits
 let lastGitHubFetch = 0;
-const CACHE_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
 
 export class UpdateService {
   /**
@@ -54,59 +55,77 @@ export class UpdateService {
 
   /**
    * Get the latest version info.
-   * Optionally checks GitHub API if 15 minutes have passed since last check.
+   * Checks cloud version-manifest.json from GitHub if cache has expired.
    */
   static async getVersionInfo(clientVersion?: string): Promise<AppUpdateMetadata & { hasUpdate: boolean; currentVersion: string }> {
     const now = Date.now();
 
-    // Check GitHub Releases if repo is public and cache has expired
+    // Check Cloud version-manifest and GitHub Releases in parallel
     if (now - lastGitHubFetch > CACHE_DURATION_MS) {
+      lastGitHubFetch = now;
       try {
-        lastGitHubFetch = now;
-        const res = await fetch(
-          'https://api.github.com/repos/futuredrivingschool9620-create/Future-driving-school/releases/latest',
-          {
-            headers: {
-              'User-Agent': 'Future-Driving-School-Update-Checker',
-              Accept: 'application/vnd.github.v3+json',
-            },
-          }
-        );
+        const [manifestRes, releaseRes] = await Promise.allSettled([
+          fetch(
+            'https://raw.githubusercontent.com/futuredrivingschool9620-create/Future-driving-school/main/version-manifest.json',
+            { headers: { 'Cache-Control': 'no-cache' } }
+          ),
+          fetch(
+            'https://api.github.com/repos/futuredrivingschool9620-create/Future-driving-school/releases/latest',
+            {
+              headers: {
+                'User-Agent': 'Future-Driving-School-Update-Checker',
+                Accept: 'application/vnd.github.v3+json',
+              },
+            }
+          ),
+        ]);
 
-        if (res.ok) {
-          const data = (await res.json()) as any;
-          if (data && data.tag_name) {
-            const githubVersion = data.tag_name.replace(/^v/i, '');
-            // Only adopt GitHub version if it is greater than or equal to current configured version
-            if (this.compareVersions(githubVersion, currentUpdateInfo.latestVersion) >= 0) {
-              currentUpdateInfo.latestVersion = githubVersion;
-              currentUpdateInfo.releaseDate = new Date(data.published_at || data.created_at).toLocaleDateString('en-IN', {
-                day: 'numeric',
-                month: 'long',
-                year: 'numeric',
-              });
-              if (data.body) {
-                const lines = data.body
-                  .split('\n')
-                  .map((l: string) => l.trim().replace(/^[-*•]\s*/, ''))
-                  .filter((l: string) => l.length > 0 && !l.startsWith('#'));
-                if (lines.length > 0) {
-                  currentUpdateInfo.releaseNotes = lines;
-                }
-              }
-              // Check for .exe asset in GitHub release
-              const exeAsset = data.assets?.find((a: any) => a.name?.endsWith('.exe'));
-              if (exeAsset?.browser_download_url) {
-                currentUpdateInfo.downloadUrl = exeAsset.browser_download_url;
-              } else if (data.html_url) {
-                currentUpdateInfo.downloadUrl = data.html_url;
+        // Process Cloud Manifest
+        if (manifestRes.status === 'fulfilled' && manifestRes.value.ok) {
+          try {
+            const manifest = (await manifestRes.value.json()) as any;
+            if (manifest && manifest.latestVersion) {
+              if (this.compareVersions(manifest.latestVersion, currentUpdateInfo.latestVersion) >= 0) {
+                currentUpdateInfo = { ...currentUpdateInfo, ...manifest };
               }
             }
-          }
+          } catch {}
+        }
+
+        // Process GitHub Release
+        if (releaseRes.status === 'fulfilled' && releaseRes.value.ok) {
+          try {
+            const data = (await releaseRes.value.json()) as any;
+            if (data && data.tag_name) {
+              const githubVersion = data.tag_name.replace(/^v/i, '');
+              if (this.compareVersions(githubVersion, currentUpdateInfo.latestVersion) >= 0) {
+                currentUpdateInfo.latestVersion = githubVersion;
+                currentUpdateInfo.releaseDate = new Date(data.published_at || data.created_at).toLocaleDateString('en-IN', {
+                  day: 'numeric',
+                  month: 'long',
+                  year: 'numeric',
+                });
+                if (data.body) {
+                  const lines = data.body
+                    .split('\n')
+                    .map((l: string) => l.trim().replace(/^[-*•]\s*/, ''))
+                    .filter((l: string) => l.length > 0 && !l.startsWith('#'));
+                  if (lines.length > 0) {
+                    currentUpdateInfo.releaseNotes = lines;
+                  }
+                }
+                const exeAsset = data.assets?.find((a: any) => a.name?.endsWith('.exe'));
+                if (exeAsset?.browser_download_url) {
+                  currentUpdateInfo.downloadUrl = exeAsset.browser_download_url;
+                } else if (data.html_url) {
+                  currentUpdateInfo.downloadUrl = data.html_url;
+                }
+              }
+            }
+          } catch {}
         }
       } catch (err) {
-        // Non-fatal: fallback to server config
-        console.warn('[UpdateService] GitHub check skipped/failed, using local metadata');
+        console.warn('[UpdateService] Cloud version check skipped/failed, using local metadata');
       }
     }
 

@@ -18,25 +18,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   const refreshProfile = useCallback(async () => {
-    try {
-      const profile = await authApi.getProfile();
-      setAdmin(profile);
-    } catch {
-      setAdmin(null);
-      setAccessToken(null);
-    }
+    const profile = await authApi.getProfile();
+    setAdmin(profile);
   }, []);
 
   // Try to restore session on mount
   useEffect(() => {
     const initAuth = async () => {
       try {
-        // Try to refresh the token using the cookie
-        await authApi.refresh();
+        // 1. Try to restore session using stored access token
         await refreshProfile();
       } catch {
-        // Not authenticated
-        setAdmin(null);
+        try {
+          // 2. Fallback to refreshing token via cookie
+          await authApi.refresh();
+          await refreshProfile();
+        } catch {
+          // Not authenticated
+          setAdmin(null);
+          setAccessToken(null);
+        }
       } finally {
         setIsLoading(false);
       }

@@ -26,7 +26,20 @@ import type {
   AppVersionInfo,
 } from '../types';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+const getApiBase = () => {
+  if (
+    typeof window !== 'undefined' &&
+    (window.electronAPI?.isElectron ||
+      window.location.protocol === 'file:' ||
+      !window.location.origin ||
+      window.location.origin === 'null')
+  ) {
+    return 'http://localhost:3001/api';
+  }
+  return import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+};
+
+const API_BASE = getApiBase();
 
 const api = axios.create({
   baseURL: API_BASE,
@@ -38,20 +51,33 @@ const api = axios.create({
 
 // ── Token Management ──
 
-let accessToken: string | null = null;
+const TOKEN_STORAGE_KEY = 'fds_access_token';
+
+let accessToken: string | null = typeof window !== 'undefined' ? localStorage.getItem(TOKEN_STORAGE_KEY) : null;
 
 export function setAccessToken(token: string | null) {
   accessToken = token;
+  if (typeof window !== 'undefined') {
+    if (token) {
+      localStorage.setItem(TOKEN_STORAGE_KEY, token);
+    } else {
+      localStorage.removeItem(TOKEN_STORAGE_KEY);
+    }
+  }
 }
 
 export function getAccessToken(): string | null {
+  if (!accessToken && typeof window !== 'undefined') {
+    accessToken = localStorage.getItem(TOKEN_STORAGE_KEY);
+  }
   return accessToken;
 }
 
 // Request interceptor — attach access token
 api.interceptors.request.use((config) => {
-  if (accessToken) {
-    config.headers.Authorization = `Bearer ${accessToken}`;
+  const token = getAccessToken();
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
@@ -82,7 +108,9 @@ api.interceptors.response.use(
       } catch {
         // Refresh failed — clear token, user needs to re-login
         setAccessToken(null);
-        window.location.href = '/login';
+        if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+          window.location.href = '/login';
+        }
         return Promise.reject(error);
       }
     }

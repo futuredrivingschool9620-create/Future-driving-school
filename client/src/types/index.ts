@@ -386,6 +386,7 @@ export interface AppVersionInfo {
 }
 
 declare global {
+  const __APP_VERSION__: string;
   const __APP_BUILD_ID__: string;
   const __APP_BUILD_TIME__: string;
 
@@ -399,6 +400,8 @@ declare global {
       minimizeWindow?: () => void;
       maximizeWindow?: () => void;
       closeWindow?: () => void;
+      reloadApp?: () => void;
+      applyInAppUpdate?: (url: string) => Promise<{ success: boolean; error?: string }>;
     };
   }
 }

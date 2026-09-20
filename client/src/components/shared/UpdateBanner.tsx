@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 
 interface UpdateBannerProps {
+  version?: string;
   onUpdateNow: () => Promise<void> | void;
   onLater: () => void;
 }
 
-export const UpdateBanner: React.FC<UpdateBannerProps> = ({ onUpdateNow, onLater }) => {
+export const UpdateBanner: React.FC<UpdateBannerProps> = ({ version, onUpdateNow, onLater }) => {
   const [isUpdating, setIsUpdating] = useState(false);
 
   const handleUpdate = async () => {
@@ -13,8 +14,9 @@ export const UpdateBanner: React.FC<UpdateBannerProps> = ({ onUpdateNow, onLater
     try {
       await onUpdateNow();
     } catch (err) {
-      console.error('Update reload failed:', err);
-      window.location.reload();
+      console.error('Update action failed:', err);
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -33,9 +35,11 @@ export const UpdateBanner: React.FC<UpdateBannerProps> = ({ onUpdateNow, onLater
             <div className="flex-1 min-w-0">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 New Update Available
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-teal-500/20 text-teal-300 border border-teal-500/30">
-                  Live
-                </span>
+                {version && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-teal-500/20 text-teal-300 border border-teal-500/30 font-mono">
+                    v{version}
+                  </span>
+                )}
               </h3>
               <p className="text-xs text-slate-300 mt-1 leading-relaxed">
                 A new update is available for the system.
