@@ -3,7 +3,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('electronAPI', {
   platform: process.platform,
   isElectron: true,
-  appVersion: require('../package.json').version,
+  appVersion: '1.4.1',
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
   openExternalUrl: (url) => ipcRenderer.send('open-external-url', url),
   minimizeWindow: () => ipcRenderer.send('window-minimize'),

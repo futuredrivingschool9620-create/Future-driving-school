@@ -376,7 +376,11 @@ export default function SettingsPage() {
       setNewPassword('');
       setConfirmPassword('');
       setTimeout(() => {
-        window.location.href = '/login';
+        if (typeof window !== 'undefined' && (window.location.protocol === 'file:' || window.location.hash)) {
+          window.location.hash = '#/login';
+        } else {
+          window.location.href = '/login';
+        }
       }, 2000);
     } catch (err: unknown) {
       const message =
@@ -407,7 +411,11 @@ export default function SettingsPage() {
     try {
       await logout();
     } catch {
-      window.location.href = '/login';
+      if (typeof window !== 'undefined' && (window.location.protocol === 'file:' || window.location.hash)) {
+        window.location.hash = '#/login';
+      } else {
+        window.location.href = '/login';
+      }
     }
   };
 

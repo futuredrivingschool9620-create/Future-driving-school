@@ -156,8 +156,12 @@ api.interceptors.response.use(
       } catch {
         // Refresh failed — clear token, user needs to re-login
         setAccessToken(null);
-        if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
-          window.location.href = '/login';
+        if (typeof window !== 'undefined') {
+          if (window.location.protocol === 'file:' || window.location.hash) {
+            window.location.hash = '#/login';
+          } else if (window.location.pathname !== '/login') {
+            window.location.href = '/login';
+          }
         }
         return Promise.reject(error);
       }

@@ -4,6 +4,9 @@ const fs = require('fs');
 const { spawn } = require('child_process');
 const http = require('http');
 
+app.commandLine.appendSwitch('allow-file-access-from-files');
+app.commandLine.appendSwitch('disable-web-security');
+
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 let mainWindow = null;
 let serverProcess = null;
@@ -178,6 +181,10 @@ function createWindow() {
 
   mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
     console.error('MainWindow failed to load:', errorCode, errorDescription, validatedURL);
+    if (validatedURL && (validatedURL.includes('/login') || !validatedURL.includes('index.html'))) {
+      console.log('[Electron] Attempting recovery to local index.html');
+      loadAppContent();
+    }
   });
 
   mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
