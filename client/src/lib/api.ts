@@ -501,6 +501,20 @@ export const renewalApi = {
   getForCustomer: async (customerId: string, page = 1, limit = 20): Promise<PaginatedResponse<RenewalHistory>> => {
     return cachedGet<PaginatedResponse<RenewalHistory>>(`/renewals/customer/${customerId}`, { page, limit });
   },
+
+  deleteRange: async (startDate: string, endDate: string, customerId?: string): Promise<{ message: string; count: number }> => {
+    const { data } = await api.delete<{ message: string; count: number }>('/renewals/range', {
+      data: { startDate, endDate, customerId },
+    });
+    invalidateClientCache('/renewals');
+    return data;
+  },
+
+  delete: async (id: string): Promise<{ message: string }> => {
+    const { data } = await api.delete<{ message: string }>(`/renewals/${id}`);
+    invalidateClientCache('/renewals');
+    return data;
+  },
 };
 
 // ── Dashboard API ──

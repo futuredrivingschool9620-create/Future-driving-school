@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { RenewalService } from '../services/renewal.service.js';
 import { getParam, getQuery } from '../utils/express.js';
+import { BadRequestError } from '../utils/errors.js';
 
 export class RenewalController {
   static async getAll(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -33,6 +34,36 @@ export class RenewalController {
       const limit = parseInt(getQuery(req, 'limit') || '20');
       const result = await RenewalService.getHistoryForCustomer(customerId, page, limit);
       res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async deleteRange(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const startDate = (req.body?.startDate || req.query?.startDate) as string;
+      const endDate = (req.body?.endDate || req.query?.endDate) as string;
+      const customerId = (req.body?.customerId || req.query?.customerId) as string | undefined;
+
+      if (!startDate || !endDate) {
+        throw new BadRequestError('Both startDate and endDate are required');
+      }
+
+      const result = await RenewalService.deleteRange(startDate, endDate, customerId);
+      res.json({
+        message: `Successfully deleted ${result.count} renewal records`,
+        count: result.count,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async delete(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = getParam(req, 'id');
+      await RenewalService.delete(id);
+      res.json({ message: 'Renewal record deleted successfully' });
     } catch (error) {
       next(error);
     }

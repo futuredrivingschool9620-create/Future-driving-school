@@ -1,16 +1,15 @@
 {
-  "latestVersion": "1.4.1",
+  "latestVersion": "1.4.2",
   "releaseDate": "20 September 2026",
   "releaseNotes": [
-    "🚀 Version 1.4.1 release with seamless in-app auto-update",
-    "✨ Live cloud update verification & zero-login-redirect fix",
-    "⚡ Instant background sync and fleet document compliance",
-    "🔔 Real-time WhatsApp alert and notification controls"
+    "🗑️ Added bulk renewal history deletion by date range",
+    "✨ Added individual renewal record delete option",
+    "🚀 Seamless in-app auto-update and performance enhancements"
   ],
-  "downloadUrl": "https://github.com/futuredrivingschool9620-create/Future-driving-school/releases/download/v1.4.1/Future-Driving-School-Setup-1.4.1.exe",
-  "installerUrl": "https://github.com/futuredrivingschool9620-create/Future-driving-school/releases/download/v1.4.1/Future-Driving-School-Setup-1.4.1.exe",
+  "downloadUrl": "https://github.com/futuredrivingschool9620-create/Future-driving-school/releases/download/v1.4.2/Future-Driving-School-Setup-1.4.2.exe",
+  "installerUrl": "https://github.com/futuredrivingschool9620-create/Future-driving-school/releases/download/v1.4.2/Future-Driving-School-Setup-1.4.2.exe",
   "updateBundleUrl": "https://raw.githubusercontent.com/futuredrivingschool9620-create/Future-driving-school/main/update-bundle.zip",
   "mandatory": false,
   "minSupportedVersion": "1.0.0",
-  "buildId": "1.4.1"
+  "buildId": "1.4.2"
 }

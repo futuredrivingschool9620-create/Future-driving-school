@@ -82,4 +82,41 @@ export class RenewalService {
       pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
     };
   }
+
+  /**
+   * Delete renewal history records within a date range (and optionally for a customer).
+   */
+  static async deleteRange(startDate: string, endDate: string, customerId?: string) {
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+
+    const where: any = {
+      renewalDate: {
+        gte: start,
+        lte: end,
+      },
+    };
+
+    if (customerId) {
+      where.customerId = customerId;
+    }
+
+    const result = await prisma.renewalHistory.deleteMany({
+      where,
+    });
+
+    return result;
+  }
+
+  /**
+   * Delete a single renewal history record by ID.
+   */
+  static async delete(id: string) {
+    return prisma.renewalHistory.delete({
+      where: { id },
+    });
+  }
 }
