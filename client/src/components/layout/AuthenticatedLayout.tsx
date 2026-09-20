@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useState, useEffect, useCallback } from 'react';
 import logoImg from '../../preset/WhatsApp.jpeg';
 import { UpdateBanner } from '../shared/UpdateBanner';
-import { appApi } from '../../lib/api';
+import { appApi, safeSessionStorage } from '../../lib/api';
 
 const navItems = [
   {
@@ -88,7 +88,7 @@ export default function AuthenticatedLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const savedVersion = typeof window !== 'undefined' ? sessionStorage.getItem('installed_override_version') : null;
+  const savedVersion = safeSessionStorage.getItem('installed_override_version');
   const clientVersion = savedVersion || CURRENT_APP_VERSION || window.electronAPI?.appVersion || '1.3.0';
 
   // Application Update State
@@ -153,7 +153,7 @@ export default function AuthenticatedLayout() {
         setHasUpdate(true);
         setLatestVersion(serverVersion);
 
-        const dismissedVer = sessionStorage.getItem('dismissed_update_version');
+        const dismissedVer = safeSessionStorage.getItem('dismissed_update_version');
         if (dismissedVer !== serverVersion) {
           setShowUpdateBanner(true);
         }
@@ -192,9 +192,7 @@ export default function AuthenticatedLayout() {
 
   const handleLater = () => {
     if (latestVersion) {
-      try {
-        sessionStorage.setItem('dismissed_update_version', latestVersion);
-      } catch {}
+      safeSessionStorage.setItem('dismissed_update_version', latestVersion);
     }
     setShowUpdateBanner(false);
   };

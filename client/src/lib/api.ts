@@ -49,26 +49,74 @@ const api = axios.create({
   },
 });
 
+// ── Safe Storage Helpers (prevents crashes under file:// protocol or restricted environments) ──
+
+export const safeStorage = {
+  getItem: (key: string): string | null => {
+    try {
+      return typeof window !== 'undefined' && window.localStorage ? window.localStorage.getItem(key) : null;
+    } catch {
+      return null;
+    }
+  },
+  setItem: (key: string, value: string): void => {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.setItem(key, value);
+      }
+    } catch {}
+  },
+  removeItem: (key: string): void => {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.removeItem(key);
+      }
+    } catch {}
+  },
+};
+
+export const safeSessionStorage = {
+  getItem: (key: string): string | null => {
+    try {
+      return typeof window !== 'undefined' && window.sessionStorage ? window.sessionStorage.getItem(key) : null;
+    } catch {
+      return null;
+    }
+  },
+  setItem: (key: string, value: string): void => {
+    try {
+      if (typeof window !== 'undefined' && window.sessionStorage) {
+        window.sessionStorage.setItem(key, value);
+      }
+    } catch {}
+  },
+  removeItem: (key: string): void => {
+    try {
+      if (typeof window !== 'undefined' && window.sessionStorage) {
+        window.sessionStorage.removeItem(key);
+      }
+    } catch {}
+  },
+};
+
 // ── Token Management ──
 
 const TOKEN_STORAGE_KEY = 'fds_access_token';
 
-let accessToken: string | null = typeof window !== 'undefined' ? localStorage.getItem(TOKEN_STORAGE_KEY) : null;
+let accessToken: string | null = safeStorage.getItem(TOKEN_STORAGE_KEY);
 
 export function setAccessToken(token: string | null) {
   accessToken = token;
-  if (typeof window !== 'undefined') {
-    if (token) {
-      localStorage.setItem(TOKEN_STORAGE_KEY, token);
-    } else {
-      localStorage.removeItem(TOKEN_STORAGE_KEY);
-    }
+  if (token) {
+    safeStorage.setItem(TOKEN_STORAGE_KEY, token);
+  } else {
+    safeStorage.removeItem(TOKEN_STORAGE_KEY);
   }
 }
 
 export function getAccessToken(): string | null {
-  if (!accessToken && typeof window !== 'undefined') {
-    accessToken = localStorage.getItem(TOKEN_STORAGE_KEY);
+  if (!accessToken) {
+    accessToken = safeStorage.getItem(TOKEN_STORAGE_KEY);
   }
   return accessToken;
 }

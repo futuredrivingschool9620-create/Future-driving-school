@@ -1,6 +1,6 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { authApi, dashboardApi, appApi } from '../../lib/api';
+import { authApi, dashboardApi, appApi, safeStorage, safeSessionStorage } from '../../lib/api';
 import type { AppVersionInfo } from '../../types';
 import { CURRENT_APP_VERSION } from '../../config/version';
 
@@ -22,8 +22,8 @@ export default function SettingsPage() {
   // App Version & Update State
   const [clientVersion, setClientVersion] = useState<string>(() => {
     return (
-      (typeof window !== 'undefined' &&
-        (localStorage.getItem('fds_client_version') || sessionStorage.getItem('installed_override_version'))) ||
+      safeStorage.getItem('fds_client_version') ||
+      safeSessionStorage.getItem('installed_override_version') ||
       CURRENT_APP_VERSION ||
       window.electronAPI?.appVersion ||
       '1.3.0'
@@ -327,8 +327,8 @@ export default function SettingsPage() {
       }
 
       // Persist new version to both localStorage and sessionStorage
-      localStorage.setItem('fds_client_version', latestVer);
-      sessionStorage.setItem('installed_override_version', latestVer);
+      safeStorage.setItem('fds_client_version', latestVer);
+      safeSessionStorage.setItem('installed_override_version', latestVer);
       setClientVersion(latestVer);
 
       setUpdateStep('completed');
