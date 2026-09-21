@@ -10,6 +10,8 @@ router.get('/', RenewalController.getAll);
 router.get('/document/:documentId', RenewalController.getForDocument);
 router.get('/customer/:customerId', RenewalController.getForCustomer);
 router.delete('/range', RenewalController.deleteRange);
+router.delete('/batch', RenewalController.deleteBatch);
+router.delete('/all', RenewalController.deleteAll);
 router.delete('/:id', RenewalController.delete);
 
 export default router;

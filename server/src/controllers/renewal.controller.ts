@@ -59,6 +59,34 @@ export class RenewalController {
     }
   }
 
+  static async deleteBatch(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { ids } = req.body;
+      if (!Array.isArray(ids) || ids.length === 0) {
+        throw new BadRequestError('ids array is required');
+      }
+      const result = await RenewalService.deleteBatch(ids);
+      res.json({
+        message: `Successfully deleted ${result.count} renewal records`,
+        count: result.count,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async deleteAll(_req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const result = await RenewalService.deleteAll();
+      res.json({
+        message: `Successfully deleted all ${result.count} renewal records`,
+        count: result.count,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   static async delete(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const id = getParam(req, 'id');

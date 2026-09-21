@@ -510,6 +510,20 @@ export const renewalApi = {
     return data;
   },
 
+  deleteBatch: async (ids: string[]): Promise<{ message: string; count: number }> => {
+    const { data } = await api.delete<{ message: string; count: number }>('/renewals/batch', {
+      data: { ids },
+    });
+    invalidateClientCache('/renewals');
+    return data;
+  },
+
+  deleteAll: async (): Promise<{ message: string; count: number }> => {
+    const { data } = await api.delete<{ message: string; count: number }>('/renewals/all');
+    invalidateClientCache('/renewals');
+    return data;
+  },
+
   delete: async (id: string): Promise<{ message: string }> => {
     const { data } = await api.delete<{ message: string }>(`/renewals/${id}`);
     invalidateClientCache('/renewals');

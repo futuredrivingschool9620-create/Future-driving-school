@@ -112,6 +112,24 @@ export class RenewalService {
   }
 
   /**
+   * Delete multiple renewal history records by IDs.
+   */
+  static async deleteBatch(ids: string[]) {
+    return prisma.renewalHistory.deleteMany({
+      where: {
+        id: { in: ids },
+      },
+    });
+  }
+
+  /**
+   * Delete all renewal history records.
+   */
+  static async deleteAll() {
+    return prisma.renewalHistory.deleteMany({});
+  }
+
+  /**
    * Delete a single renewal history record by ID.
    */
   static async delete(id: string) {
