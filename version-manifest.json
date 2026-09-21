@@ -1,15 +1,15 @@
 {
-  "latestVersion": "1.4.2",
-  "releaseDate": "20 September 2026",
+  "latestVersion": "1.4.3",
+  "releaseDate": "21 September 2026",
   "releaseNotes": [
-    "🗑️ Added bulk renewal history deletion by date range",
-    "✨ Added individual renewal record delete option",
-    "🚀 Seamless in-app auto-update and performance enhancements"
+    "🗑️ Complete renewal deletion suite (Date Range, Multi-Select, and Single Row)",
+    "⚡ Seamless in-app real-time OTA updates without package downloads",
+    "🚀 Instant background reload & automatic version synchronization"
   ],
   "downloadUrl": "https://github.com/futuredrivingschool9620-create/Future-driving-school/releases/download/v1.4.2/Future-Driving-School-Setup-1.4.2.exe",
   "installerUrl": "https://github.com/futuredrivingschool9620-create/Future-driving-school/releases/download/v1.4.2/Future-Driving-School-Setup-1.4.2.exe",
   "updateBundleUrl": "https://raw.githubusercontent.com/futuredrivingschool9620-create/Future-driving-school/main/update-bundle.zip",
   "mandatory": false,
   "minSupportedVersion": "1.0.0",
-  "buildId": "1.4.2"
+  "buildId": "1.4.3"
 }
