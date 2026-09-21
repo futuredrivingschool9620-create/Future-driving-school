@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import logoImg from '../../preset/WhatsApp.jpeg';
+import SEO from '../../components/shared/SEO';
 
 const FEATURES = [
   {
@@ -46,7 +47,7 @@ export default function LoginPage() {
       const message =
         err && typeof err === 'object' && 'response' in err
           ? (err as { response?: { data?: { error?: string } } }).response?.data?.error || 'Login failed'
-          : 'Network error. Please try again.';
+          : 'Network error. Is the server running?';
       setError(message);
     } finally {
       setIsLoading(false);
@@ -55,6 +56,10 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex relative overflow-hidden bg-slate-50">
+      <SEO
+        title="Admin Portal Login"
+        description="Sign in to Future Driving School Admin Portal to manage customer records, vehicle renewals, and automated notifications."
+      />
       <style>{`
         @keyframes lp-fade-up { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes lp-float { 0%, 100% { transform: translate(0, 0) } 50% { transform: translate(12px, -18px) } }

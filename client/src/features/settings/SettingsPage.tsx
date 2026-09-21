@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { authApi, dashboardApi, appApi, safeStorage, safeSessionStorage } from '../../lib/api';
 import type { AppVersionInfo } from '../../types';
 import { CURRENT_APP_VERSION } from '../../config/version';
+import SEO from '../../components/shared/SEO';
 
 export default function SettingsPage() {
   const { logout, admin } = useAuth();
@@ -405,6 +406,10 @@ export default function SettingsPage() {
 
   return (
     <div className="max-w-4xl space-y-6 mx-auto">
+      <SEO
+        title="Settings & Updates"
+        description="Configure account settings, security passwords, automated reminder schedules, and in-app updates."
+      />
       <div>
         <h1 className="text-2xl font-bold" style={{ color: 'var(--color-text-primary)' }}>
           System Settings & Control Panel

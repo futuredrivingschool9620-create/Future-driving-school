@@ -6,6 +6,7 @@ import { validateAndFormatVehicleNumber } from '../../lib/vehicleValidation';
 import type { Customer } from '../../types';
 import StatusBadge from '../../components/shared/StatusBadge';
 import { useVirtualTable } from '../../hooks/useVirtualTable';
+import SEO from '../../components/shared/SEO';
 
 const enrichDocStatus = (doc: any) => {
   if (!doc) return null;
@@ -168,6 +169,10 @@ export default function CustomerListPage() {
 
   return (
     <div className="space-y-6 w-full mx-auto">
+      <SEO
+        title="Customer Directory"
+        description="Search, view, and manage customers, vehicle details, and document validity at Future Driving School."
+      />
       {/* Toast Feedback */}
       {successMessage && (
         <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-sm flex items-center justify-between shadow-sm">

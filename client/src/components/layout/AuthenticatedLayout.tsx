@@ -152,15 +152,15 @@ export default function AuthenticatedLayout() {
         webData?.version;
 
       if (serverVersion && compareVersions(serverVersion, clientVersion) > 0) {
-        setHasUpdate(true);
-        setLatestVersion(serverVersion);
+        setHasUpdate((prev) => (prev !== true ? true : prev));
+        setLatestVersion((prev) => (prev !== serverVersion ? serverVersion : prev));
 
         const dismissedVer = safeSessionStorage.getItem('dismissed_update_version');
         if (dismissedVer !== serverVersion) {
-          setShowUpdateBanner(true);
+          setShowUpdateBanner((prev) => (prev !== true ? true : prev));
         }
       } else {
-        setHasUpdate(false);
+        setHasUpdate((prev) => (prev !== false ? false : prev));
       }
     } catch {
       // Silent failure - do not interrupt user

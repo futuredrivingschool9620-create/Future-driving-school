@@ -74,8 +74,8 @@ export function useVirtualTable<T>({
   const totalCount = items.length;
   const totalHeight = totalCount * estimatedRowHeight;
 
-  // If list is small (<= 15 items), render all directly with zero overhead
-  if (totalCount <= 15) {
+  // Standard paginated tables (15-50 rows) render directly with zero virtualization overhead or flicker
+  if (totalCount <= 50) {
     return {
       containerRef,
       visibleItems: items.map((item, index) => ({ item, index })),
@@ -85,10 +85,13 @@ export function useVirtualTable<T>({
     };
   }
 
-  const startIndex = Math.max(0, Math.floor(scrollTop / estimatedRowHeight) - overscan);
+  const safeScrollTop = Math.max(0, scrollTop);
+  const safeViewportHeight = Math.max(400, viewportHeight);
+
+  const startIndex = Math.max(0, Math.floor(safeScrollTop / estimatedRowHeight) - overscan);
   const endIndex = Math.min(
     totalCount,
-    Math.ceil((scrollTop + viewportHeight) / estimatedRowHeight) + overscan
+    Math.ceil((safeScrollTop + safeViewportHeight) / estimatedRowHeight) + overscan
   );
 
   const topSpacerHeight = startIndex * estimatedRowHeight;
@@ -97,7 +100,9 @@ export function useVirtualTable<T>({
   const visibleItems = useMemo(() => {
     const slice: { item: T; index: number }[] = [];
     for (let i = startIndex; i < endIndex; i++) {
-      slice.push({ item: items[i], index: i });
+      if (items[i]) {
+        slice.push({ item: items[i], index: i });
+      }
     }
     return slice;
   }, [items, startIndex, endIndex]);

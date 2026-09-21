@@ -4,6 +4,7 @@ import { dashboardApi, invalidateClientCache } from '../../lib/api';
 import type { DashboardStats, FilteredDocument } from '../../types';
 import { useSSE } from '../../hooks/useSSE';
 import StatusBadge from '../../components/shared/StatusBadge';
+import SEO from '../../components/shared/SEO';
 
 const QUICK_LINKS = [
   {
@@ -156,7 +157,11 @@ export default function HomePage() {
   ];
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto">
+    <div className="space-y-8 max-w-7xl mx-auto pb-12">
+      <SEO
+        title="Overview & Expiry Alerts"
+        description="Monitor vehicle document compliance, critical expiry alerts, and fleet status for Future Driving School."
+      />
       <style>{`
         @keyframes hp-fade-up { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes hp-float { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(-10px) } }

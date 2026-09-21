@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { renewalApi } from '../../lib/api';
 import type { RenewalHistory } from '../../types';
 import { useVirtualTable } from '../../hooks/useVirtualTable';
+import SEO from '../../components/shared/SEO';
 
 export default function RenewalHistoryPage() {
   const [searchParams] = useSearchParams();
@@ -171,6 +172,10 @@ export default function RenewalHistoryPage() {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
+      <SEO
+        title="Renewal History & Records"
+        description="Audit, review, and manage historical document renewals, previous validity periods, and administrator audit logs."
+      />
       {/* Toast Feedback */}
       {successMessage && (
         <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-sm flex items-center justify-between shadow-sm animate-in fade-in duration-200">

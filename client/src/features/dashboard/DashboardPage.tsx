@@ -4,6 +4,7 @@ import { customerApi, documentApi, dashboardApi } from '../../lib/api';
 import type { Customer, FilteredDocument, DashboardFilters } from '../../types';
 import StatusBadge from '../../components/shared/StatusBadge';
 import { useSSE } from '../../hooks/useSSE';
+import SEO from '../../components/shared/SEO';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All Statuses' },
@@ -160,6 +161,10 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto">
+      <SEO
+        title="Search & Document Filter"
+        description="Search customer profiles by phone or vehicle number, and filter documents by expiration status."
+      />
       {/* Alert Notice Banner */}
       {alertNotice && (
         <div

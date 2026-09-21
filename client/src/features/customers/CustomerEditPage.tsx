@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { customerApi, documentApi } from '../../lib/api';
 import { validateAndFormatVehicleNumber } from '../../lib/vehicleValidation';
 import { validatePhoneNumber, sanitizePhoneInput } from '../../lib/phoneValidation';
+import SEO from '../../components/shared/SEO';
 
 export default function CustomerEditPage() {
   const { id } = useParams<{ id: string }>();
@@ -173,6 +174,10 @@ export default function CustomerEditPage() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
+      <SEO
+        title={firstName ? `Edit ${firstName} - Customer Profile` : 'Edit Customer'}
+        description="Update customer contact details, vehicle information, or add new document records."
+      />
       <div className="flex items-center gap-4">
         <Link
           to={`/customers/${id}`}

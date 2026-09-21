@@ -4,6 +4,7 @@ import { customerApi, documentApi, vehicleApi } from '../../lib/api';
 import type { Customer, DocumentWithStatus, Vehicle } from '../../types';
 import StatusBadge from '../../components/shared/StatusBadge';
 import { validateAndFormatVehicleNumber } from '../../lib/vehicleValidation';
+import SEO from '../../components/shared/SEO';
 
 export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -366,6 +367,10 @@ export default function CustomerDetailPage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
+      <SEO
+        title={customer.fullName ? `${customer.fullName} - Customer Profile` : 'Customer Profile'}
+        description={`View customer profile, registered vehicles, and document validity for ${customer.fullName || 'customer'}.`}
+      />
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">

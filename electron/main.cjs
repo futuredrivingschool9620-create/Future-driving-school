@@ -4,6 +4,10 @@ const fs = require('fs');
 const { spawn } = require('child_process');
 const http = require('http');
 
+// Disable hardware acceleration to eliminate screen flickering, black flashes, and visual artifacts on Windows
+app.disableHardwareAcceleration();
+app.commandLine.appendSwitch('disable-gpu-compositing');
+app.commandLine.appendSwitch('disable-software-rasterizer');
 app.commandLine.appendSwitch('allow-file-access-from-files');
 app.commandLine.appendSwitch('disable-web-security');
 
@@ -161,7 +165,7 @@ function createWindow() {
     minWidth: 1024,
     minHeight: 700,
     title: 'Future Driving School',
-    backgroundColor: '#0f172a',
+    backgroundColor: '#f8fafc',
     icon: appIcon,
     show: false,
     autoHideMenuBar: true,
@@ -170,6 +174,7 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       webSecurity: false,
+      backgroundThrottling: false,
     },
   });
 

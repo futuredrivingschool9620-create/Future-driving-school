@@ -5,6 +5,7 @@ import type { FilteredDocument, UploadedPdfRecord } from '../../types';
 import StatusBadge from '../../components/shared/StatusBadge';
 import ExportDocumentsModal from './ExportDocumentsModal';
 import { useVirtualTable } from '../../hooks/useVirtualTable';
+import SEO from '../../components/shared/SEO';
 
 export default function DocumentsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -187,6 +188,10 @@ export default function DocumentsPage() {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
+      <SEO
+        title="Documents & Expiry Control"
+        description="Monitor vehicle document expiries, trigger WhatsApp reminders, and inspect uploaded PDF archives."
+      />
       {/* Alert Notice Banner */}
       {alertNotice && (
         <div

@@ -4,6 +4,7 @@ import { customerApi } from '../../lib/api';
 import { validateAndFormatVehicleNumber } from '../../lib/vehicleValidation';
 import { validatePhoneNumber, sanitizePhoneInput } from '../../lib/phoneValidation';
 import UploadedPdfSection from './UploadedPdfSection';
+import SEO from '../../components/shared/SEO';
 
 interface OtherDocItem {
   id: string;
@@ -322,6 +323,10 @@ export default function CustomerRegistrationPage() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
+      <SEO
+        title="Customer Registration"
+        description="Register a new driving school customer, add vehicle details, and track initial document expiries."
+      />
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">

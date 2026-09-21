@@ -74,18 +74,20 @@
     margin: 0;
     padding: 0;
     box-sizing: border-box;
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
   }
 
   html {
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
 
   body {
     background-color: var(--color-bg-primary);
     color: var(--color-text-primary);
-    transition: background-color 0.3s ease, color 0.3s ease;
     overflow-x: hidden;
   }
 
@@ -123,7 +125,7 @@
     border: 1px solid var(--color-border);
     border-radius: 16px;
     box-shadow: 0 4px 6px -1px var(--color-card-shadow), 0 2px 4px -2px var(--color-card-shadow);
-    transition: all 0.3s ease;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
   }
 
   .dark .glass-card {
@@ -147,7 +149,8 @@
   }
 
   .page-enter {
-    animation: fadeInUp 0.4s ease-out;
+    animation: fadeInUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: transform, opacity;
   }
 
   .shimmer {

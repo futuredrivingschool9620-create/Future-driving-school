@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { notificationApi } from '../../lib/api';
 import type { Notification } from '../../types';
+import SEO from '../../components/shared/SEO';
 
 export default function NotificationsPage() {
   const [searchParams] = useSearchParams();
@@ -76,6 +77,10 @@ export default function NotificationsPage() {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
+      <SEO
+        title="Notification Logs & History"
+        description="Review sent, pending, and delivered automated WhatsApp and SMS expiry notifications."
+      />
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
