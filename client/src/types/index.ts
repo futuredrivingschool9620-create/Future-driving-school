@@ -379,6 +379,7 @@ export interface AppVersionInfo {
   releaseDate: string;
   releaseNotes: string[];
   downloadUrl: string;
+  updateBundleUrl?: string;
   mandatory: boolean;
   minSupportedVersion?: string;
   currentVersion: string;

@@ -38,7 +38,7 @@ export default function SettingsPage() {
   const [updateStep, setUpdateStep] = useState<UpdateStep>('idle');
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [downloadStatus, setDownloadStatus] = useState('');
-  const [downloadedFile, setDownloadedFile] = useState<string>('');
+  const downloadedFile = 'update-bundle.zip';
 
   // Clean version comparison helper (returns 1 if v1 > v2, -1 if v1 < v2, 0 if equal)
   const compareVersions = (v1: string, v2: string): number => {
@@ -134,11 +134,17 @@ export default function SettingsPage() {
       ghData?.html_url ||
       '/api/app/update-bundle.zip';
 
+    const updateBundleUrl =
+      cloudData?.updateBundleUrl ||
+      info?.updateBundleUrl ||
+      'https://raw.githubusercontent.com/futuredrivingschool9620-create/Future-driving-school/main/update-bundle.zip';
+
     return {
       highestVer,
       hasUpdate,
       resolvedNotes,
       resolvedDownloadUrl,
+      updateBundleUrl,
       releaseDate: cloudData?.releaseDate || info?.releaseDate || formatReleaseDate(ghData?.published_at || webData?.buildTime),
       mandatory: info?.mandatory || cloudData?.mandatory || false,
     };
@@ -155,6 +161,7 @@ export default function SettingsPage() {
           releaseDate: data.releaseDate,
           releaseNotes: data.resolvedNotes,
           downloadUrl: data.resolvedDownloadUrl,
+          updateBundleUrl: data.updateBundleUrl,
           mandatory: data.mandatory,
         });
 
@@ -203,96 +210,73 @@ export default function SettingsPage() {
     setUpdateMsg('');
 
     try {
-      const targetUrl = versionInfo?.downloadUrl || '/api/app/update-bundle.zip';
-      const isZip = targetUrl.endsWith('.zip');
-      const filename = isZip
-        ? `Future-Driving-School-v${versionInfo?.latestVersion || '1.4.0'}-update.zip`
-        : `Future-Driving-School-Setup-${versionInfo?.latestVersion || '1.4.0'}.exe`;
-      setDownloadedFile(filename);
+      const bundleUrl =
+        versionInfo?.updateBundleUrl ||
+        'https://raw.githubusercontent.com/futuredrivingschool9620-create/Future-driving-school/main/update-bundle.zip';
+      const latestVer = versionInfo?.latestVersion || '1.4.2';
 
-      // If running in Windows Electron desktop app:
-      if (window.electronAPI?.applyInAppUpdate && isZip) {
+      // 1. If running in Windows Electron desktop app:
+      if (window.electronAPI?.applyInAppUpdate) {
         setDownloadProgress(40);
-        setDownloadStatus(`Downloading package for v${versionInfo?.latestVersion || '1.4.0'}...`);
+        setDownloadStatus(`Downloading in-app update package for v${latestVer}...`);
 
         const timer = setInterval(() => {
-          setDownloadProgress((prev) => (prev < 90 ? prev + 15 : prev));
-        }, 300);
+          setDownloadProgress((prev) => (prev < 90 ? prev + 10 : prev));
+        }, 250);
 
-        const res = await window.electronAPI.applyInAppUpdate(targetUrl);
+        const res = await window.electronAPI.applyInAppUpdate(bundleUrl);
         clearInterval(timer);
 
         if (res.success) {
           setDownloadProgress(100);
-          setDownloadStatus('Download complete!');
-          setUpdateStep('ready');
-          setUpdateMsg('✅ Update package downloaded. Click "Install Update Now" below.');
+          setDownloadStatus('Update package applied successfully!');
+          safeStorage.setItem('fds_client_version', latestVer);
+          safeSessionStorage.setItem('installed_override_version', latestVer);
+          setClientVersion(latestVer);
+          setUpdateStep('completed');
+          setUpdateMsg(`🎉 Version ${latestVer} installed in-app! Restarting...`);
+
+          setTimeout(() => {
+            if (window.electronAPI?.reloadApp) {
+              window.electronAPI.reloadApp();
+            } else {
+              window.location.reload();
+            }
+          }, 1000);
           return;
         } else {
-          throw new Error(res.error || 'Electron in-app update download failed');
+          throw new Error(res.error || 'Electron in-app update failed');
         }
       }
 
-      // If target is an installer .exe in Electron desktop app:
-      if (window.electronAPI?.openExternalUrl && targetUrl.startsWith('http') && targetUrl.endsWith('.exe')) {
-        setDownloadProgress(100);
-        setDownloadStatus('Download initiated in your browser...');
-        setUpdateStep('ready');
-        window.electronAPI.openExternalUrl(targetUrl);
-        setUpdateMsg(`✅ Installer download started. Run the downloaded setup to complete the update.`);
-        return;
+      // 2. Web / Browser mode:
+      setDownloadProgress(60);
+      setDownloadStatus(`Updating web application to v${latestVer}...`);
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map((r) => r.unregister()));
+      }
+      if ('caches' in window) {
+        const names = await caches.keys();
+        await Promise.all(names.map((n) => caches.delete(n)));
       }
 
-      // Web / Browser mode:
-      setDownloadProgress(45);
-      setDownloadStatus(`Downloading ${filename}...`);
-
-      const response = await fetch(targetUrl, { cache: 'no-store' });
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      setDownloadProgress(80);
-      setDownloadStatus(`Saving ${filename}...`);
-
-      const blob = await response.blob();
-      const blobUrl = window.URL.createObjectURL(blob);
-
-      // Trigger browser download to computer
-      const a = document.createElement('a');
-      a.href = blobUrl;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => window.URL.revokeObjectURL(blobUrl), 10000);
+      safeStorage.setItem('fds_client_version', latestVer);
+      safeSessionStorage.setItem('installed_override_version', latestVer);
+      setClientVersion(latestVer);
 
       setDownloadProgress(100);
-      setDownloadStatus('Download complete!');
-      setUpdateStep('ready');
-      setUpdateMsg(`✅ Successfully downloaded ${filename} to your Downloads folder!`);
+      setDownloadStatus('Update applied!');
+      setUpdateStep('completed');
+      setUpdateMsg(`🎉 Application updated to v${latestVer}! Reloading...`);
+
+      setTimeout(() => {
+        window.location.reload();
+      }, 800);
     } catch (err: any) {
-      console.error('Download error:', err);
-      // Fallback: direct window download via browser navigation
-      try {
-        const fallbackUrl = '/api/app/download-installer';
-        if (window.electronAPI?.openExternalUrl) {
-          window.electronAPI.openExternalUrl(`http://localhost:3001${fallbackUrl}`);
-        } else {
-          const a = document.createElement('a');
-          a.href = fallbackUrl;
-          a.download = `Future-Driving-School-Setup-${versionInfo?.latestVersion || '1.4.0'}.exe`;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-        }
-        setDownloadProgress(100);
-        setUpdateStep('ready');
-        setUpdateMsg('✅ Download started via browser download manager.');
-      } catch (fallbackErr: any) {
-        setUpdateStep('error');
-        setUpdateMsg(`❌ Update download failed: ${err.message || 'Network error'}. You can try downloading directly below.`);
-      }
+      console.error('Update error:', err);
+      setUpdateStep('error');
+      setUpdateMsg(`❌ In-app update failed: ${err.message || 'Unknown error'}`);
     }
   };
 

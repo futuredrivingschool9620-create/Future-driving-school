@@ -106,28 +106,43 @@ try {
   console.warn('[Electron] Could not read config.json, using defaults:', e.message);
 }
 
+function compareVersions(v1, v2) {
+  if (!v1 || !v2) return 0;
+  const clean = (v) => v.replace(/^v/i, '').split('.').map((n) => parseInt(n, 10) || 0);
+  const p1 = clean(v1);
+  const p2 = clean(v2);
+  for (let i = 0; i < Math.max(p1.length, p2.length); i++) {
+    const num1 = p1[i] || 0;
+    const num2 = p2[i] || 0;
+    if (num1 > num2) return 1;
+    if (num1 < num2) return -1;
+  }
+  return 0;
+}
+
 function loadAppContent() {
   if (!mainWindow) return;
   const updateDir = path.join(app.getPath('userData'), 'update');
+  const updateIndexPath = path.join(updateDir, 'index.html');
   const updateVersionJson = path.join(updateDir, 'version.json');
-  const packagedVersionJson = path.join(__dirname, '..', 'client', 'dist', 'version.json');
 
   let useUpdate = false;
-  if (fs.existsSync(updateVersionJson) && fs.existsSync(packagedVersionJson)) {
-    try {
-      const updateVer = JSON.parse(fs.readFileSync(updateVersionJson, 'utf8'));
-      const packagedVer = JSON.parse(fs.readFileSync(packagedVersionJson, 'utf8'));
-      if (
-        updateVer.buildTime &&
-        packagedVer.buildTime &&
-        new Date(updateVer.buildTime).getTime() > new Date(packagedVer.buildTime).getTime()
-      ) {
+  if (fs.existsSync(updateIndexPath)) {
+    if (fs.existsSync(updateVersionJson)) {
+      try {
+        const updateVer = JSON.parse(fs.readFileSync(updateVersionJson, 'utf8'));
+        const packagedVersion = app.getVersion();
+        if (compareVersions(updateVer.version || updateVer.buildId, packagedVersion) >= 0) {
+          useUpdate = true;
+        }
+      } catch {
         useUpdate = true;
       }
-    } catch {}
+    } else {
+      useUpdate = true;
+    }
   }
 
-  const updateIndexPath = path.join(updateDir, 'index.html');
   if (useUpdate && fs.existsSync(updateIndexPath)) {
     console.log('[Electron] Loading updated in-app bundle from:', updateIndexPath);
     mainWindow.loadFile(updateIndexPath);
@@ -231,8 +246,26 @@ ipcMain.on('window-close', () => {
   if (mainWindow) mainWindow.close();
 });
 
-ipcMain.handle('get-app-version', () => {
+function getCurrentAppVersion() {
+  try {
+    const updateDir = path.join(app.getPath('userData'), 'update');
+    const updateVersionJson = path.join(updateDir, 'version.json');
+    if (fs.existsSync(updateVersionJson)) {
+      const v = JSON.parse(fs.readFileSync(updateVersionJson, 'utf8'));
+      if (v && (v.version || v.buildId)) {
+        return v.version || v.buildId;
+      }
+    }
+  } catch {}
   return app.getVersion();
+}
+
+ipcMain.handle('get-app-version', () => {
+  return getCurrentAppVersion();
+});
+
+ipcMain.on('get-app-version-sync', (event) => {
+  event.returnValue = getCurrentAppVersion();
 });
 
 ipcMain.on('open-external-url', (_event, url) => {

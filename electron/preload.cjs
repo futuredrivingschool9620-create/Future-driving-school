@@ -3,7 +3,13 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('electronAPI', {
   platform: process.platform,
   isElectron: true,
-  appVersion: '1.4.2',
+  appVersion: (() => {
+    try {
+      return ipcRenderer.sendSync('get-app-version-sync') || '1.4.2';
+    } catch {
+      return '1.4.2';
+    }
+  })(),
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
   openExternalUrl: (url) => ipcRenderer.send('open-external-url', url),
   minimizeWindow: () => ipcRenderer.send('window-minimize'),

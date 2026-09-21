@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useState, useEffect, useCallback } from 'react';
 import logoImg from '../../preset/WhatsApp.jpeg';
 import { UpdateBanner } from '../shared/UpdateBanner';
-import { appApi, safeSessionStorage } from '../../lib/api';
+import { appApi, safeStorage, safeSessionStorage } from '../../lib/api';
 
 const navItems = [
   {
@@ -88,13 +88,15 @@ export default function AuthenticatedLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const savedVersion = safeSessionStorage.getItem('installed_override_version');
+  const savedVersion = safeStorage.getItem('fds_client_version') || safeSessionStorage.getItem('installed_override_version');
   const clientVersion = savedVersion || CURRENT_APP_VERSION || window.electronAPI?.appVersion || '1.3.0';
 
   // Application Update State
   const [showUpdateBanner, setShowUpdateBanner] = useState(false);
   const [hasUpdate, setHasUpdate] = useState(false);
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
+  const [isUpdatingInApp, setIsUpdatingInApp] = useState(false);
+  const [updateStatusText, setUpdateStatusText] = useState('');
 
   const compareVersions = (v1: string, v2: string): number => {
     const c = (v: string) => v.replace(/^v/i, '').split('.').map((n) => parseInt(n, 10) || 0);
@@ -185,9 +187,55 @@ export default function AuthenticatedLayout() {
     };
   }, [checkForUpdates]);
 
-  const handleUpdateNow = () => {
-    setShowUpdateBanner(false);
-    navigate('/settings');
+  const handleUpdateNow = async () => {
+    setIsUpdatingInApp(true);
+    setUpdateStatusText('Downloading update...');
+    try {
+      const bundleUrl = 'https://raw.githubusercontent.com/futuredrivingschool9620-create/Future-driving-school/main/update-bundle.zip';
+      const targetVer = latestVersion || '1.4.2';
+
+      if (window.electronAPI?.applyInAppUpdate) {
+        setUpdateStatusText('Extracting & applying in-app...');
+        const res = await window.electronAPI.applyInAppUpdate(bundleUrl);
+        if (res.success) {
+          safeStorage.setItem('fds_client_version', targetVer);
+          safeSessionStorage.setItem('installed_override_version', targetVer);
+          setUpdateStatusText('Restarting application...');
+          setTimeout(() => {
+            if (window.electronAPI?.reloadApp) {
+              window.electronAPI.reloadApp();
+            } else {
+              window.location.reload();
+            }
+          }, 800);
+          return;
+        } else {
+          throw new Error(res.error || 'Failed to apply in-app update');
+        }
+      }
+
+      // Web app mode fallback
+      setUpdateStatusText('Applying update...');
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map((r) => r.unregister()));
+      }
+      if ('caches' in window) {
+        const names = await caches.keys();
+        await Promise.all(names.map((n) => caches.delete(n)));
+      }
+      safeStorage.setItem('fds_client_version', targetVer);
+      safeSessionStorage.setItem('installed_override_version', targetVer);
+      setUpdateStatusText('Reloading...');
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
+    } catch (err) {
+      console.error('In-app update failed:', err);
+      navigate('/settings');
+    } finally {
+      setIsUpdatingInApp(false);
+    }
   };
 
   const handleLater = () => {
@@ -361,6 +409,8 @@ export default function AuthenticatedLayout() {
             version={latestVersion || undefined}
             onUpdateNow={handleUpdateNow}
             onLater={handleLater}
+            statusText={updateStatusText}
+            isUpdating={isUpdatingInApp}
           />
         )}
 
