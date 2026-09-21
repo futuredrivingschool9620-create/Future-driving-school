@@ -1,8 +1,8 @@
 {
-  "buildId": "1.4.3",
-  "buildTime": "2026-09-21T12:15:00.000Z",
-  "version": "1.4.3",
-  "latestVersion": "1.4.3",
+  "buildId": "1.4.4",
+  "buildTime": "2026-09-21T12:55:00.000Z",
+  "version": "1.4.4",
+  "latestVersion": "1.4.4",
   "releaseDate": "21 September 2026",
   "releaseNotes": [
     "🗑️ Complete renewal deletion suite (Date Range, Multi-Select, and Single Row)",

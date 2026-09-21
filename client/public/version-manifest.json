@@ -1,5 +1,5 @@
 {
-  "latestVersion": "1.4.3",
+  "latestVersion": "1.4.4",
   "releaseDate": "21 September 2026",
   "releaseNotes": [
     "🗑️ Complete renewal deletion suite (Date Range, Multi-Select, and Single Row)",
@@ -11,5 +11,5 @@
   "updateBundleUrl": "https://raw.githubusercontent.com/futuredrivingschool9620-create/Future-driving-school/main/update-bundle.zip",
   "mandatory": false,
   "minSupportedVersion": "1.0.0",
-  "buildId": "1.4.3"
+  "buildId": "1.4.4"
 }
