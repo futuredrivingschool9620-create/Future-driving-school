@@ -182,7 +182,8 @@ async function sendWhatsAppTemplateMessage(
     const components: any[] = [];
 
     if (hasImageHeader) {
-      const defaultLogoUrl = 'https://raw.githubusercontent.com/futuredrivingschool9620-create/Future-driving-school/main/client/public/logo.png';
+      const defaultLogoUrl =
+        'https://raw.githubusercontent.com/futuredrivingschool9620-create/Future-driving-school/main/client/public/whatsapp-banner.png';
       const headerImageUrl = process.env.WHATSAPP_HEADER_IMAGE_URL || defaultLogoUrl;
       components.push({
         type: 'header',

@@ -78,7 +78,9 @@ export class WhatsAppService {
 
       const components: any[] = [];
       if (hasImageHeader) {
-        const logoUrl = 'https://raw.githubusercontent.com/futuredrivingschool9620-create/Future-driving-school/main/client/public/logo.png';
+        const logoUrl =
+          env.WHATSAPP_HEADER_IMAGE_URL ||
+          'https://raw.githubusercontent.com/futuredrivingschool9620-create/Future-driving-school/main/client/public/whatsapp-banner.png';
         components.push({
           type: 'header',
           parameters: [{ type: 'image', image: { link: logoUrl } }],

@@ -7,7 +7,7 @@ phoneId = "1426657943854134"
 
 # Test sending future_driving_school with en, en_US, en_GB
 # Sending to admin phone 918317370639
-logoUrl = "https://raw.githubusercontent.com/futuredrivingschool9620-create/Future-driving-school/main/client/public/logo.png"
+logoUrl = "https://raw.githubusercontent.com/futuredrivingschool9620-create/Future-driving-school/main/client/public/whatsapp-banner.png"
 
 for lang in ["en", "en_US", "en_GB"]:
     for withHeader in [True, False]:

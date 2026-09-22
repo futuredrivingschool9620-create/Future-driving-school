@@ -79,6 +79,7 @@ const envSchema = z.object({
   WHATSAPP_API_TOKEN: z.string().default(''),
   WHATSAPP_PHONE_NUMBER_ID: z.string().default(''),
   WHATSAPP_TEMPLATE_NAME: z.string().default('future_driving_school'),
+  WHATSAPP_HEADER_IMAGE_URL: z.string().default('https://raw.githubusercontent.com/futuredrivingschool9620-create/Future-driving-school/main/client/public/whatsapp-banner.png'),
 
   // SMS Gateway
   SMS_ENABLED: z
