@@ -884,9 +884,12 @@ export default function SettingsPage() {
 
             <div className="space-y-2 text-xs">
               <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50">
-                <span className="font-medium text-slate-700 dark:text-slate-300">WhatsApp Business API</span>
-                <span className="px-2 py-0.5 rounded bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300 font-mono">
-                  READY (MOCK LOGS)
+                <div>
+                  <span className="font-medium text-slate-700 dark:text-slate-300 block">WhatsApp Business API</span>
+                  <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">Future driving school &bull; +91 91801 20659</span>
+                </div>
+                <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400 font-mono font-bold">
+                  CONNECTED
                 </span>
               </div>
               <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50">

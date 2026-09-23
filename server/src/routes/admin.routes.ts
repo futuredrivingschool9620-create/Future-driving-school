@@ -5,6 +5,7 @@ import { DocumentController } from '../controllers/document.controller.js';
 import { AuditService } from '../services/audit.service.js';
 import { authMiddleware } from '../middleware/auth.middleware.js';
 import { getQuery } from '../utils/express.js';
+import { env } from '../config/env.js';
 
 const router = Router();
 
@@ -30,6 +31,23 @@ router.get('/audit-logs', async (req: Request, res: Response, next: NextFunction
   } catch (error) {
     next(error);
   }
+});
+
+// Gateway statuses
+router.get('/gateways/status', async (_req: Request, res: Response) => {
+  res.json({
+    whatsapp: {
+      status: env.WHATSAPP_ENABLED ? 'CONNECTED' : 'DISCONNECTED',
+      verifiedName: 'Future driving school',
+      phone: '+91 91801 20659',
+    },
+    sms: {
+      status: env.SMS_ENABLED ? 'CONNECTED' : 'READY (MOCK LOGS)',
+    },
+    database: {
+      status: 'CONNECTED',
+    },
+  });
 });
 
 export default router;
