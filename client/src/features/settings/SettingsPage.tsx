@@ -669,7 +669,7 @@ export default function SettingsPage() {
           <button
             onClick={handleCheckUpdate}
             disabled={isCheckingUpdate || updateStep === 'downloading' || updateStep === 'installing'}
-            className="w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-white/10 dark:hover:bg-white/15 text-slate-800 dark:text-white border border-slate-300 dark:border-white/10 transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2 shadow-sm"
+            className="w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-white/10 dark:hover:bg-white/15 text-slate-800 dark:text-white border border-slate-300 dark:border-white/10 transition-colors disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2 shadow-sm"
           >
             {isCheckingUpdate ? (
               <>
@@ -789,7 +789,7 @@ export default function SettingsPage() {
         <button
           onClick={handleManualCheck}
           disabled={isTriggering}
-          className="w-full py-2.5 rounded-xl text-sm font-semibold bg-teal-600 hover:bg-teal-700 text-white transition-all disabled:opacity-50"
+          className="w-full py-2.5 rounded-xl text-sm font-semibold bg-teal-600 hover:bg-teal-700 text-white transition-colors disabled:opacity-50"
         >
           {isTriggering ? 'Running Expiry Check...' : '⚡ Trigger Immediate Expiry Check'}
         </button>
@@ -865,7 +865,7 @@ export default function SettingsPage() {
             <button
               type="submit"
               disabled={isChangingPassword || !currentPassword || !newPassword || !confirmPassword}
-              className="w-full py-2.5 rounded-xl text-sm font-semibold bg-teal-600 text-white hover:bg-teal-700 transition-all disabled:opacity-50"
+              className="w-full py-2.5 rounded-xl text-sm font-semibold bg-teal-600 text-white hover:bg-teal-700 transition-colors disabled:opacity-50"
             >
               {isChangingPassword ? 'Updating...' : 'Update Password'}
             </button>
@@ -914,7 +914,7 @@ export default function SettingsPage() {
 
             <button
               onClick={handleLogout}
-              className="w-full py-2.5 rounded-xl text-sm font-semibold bg-rose-50 text-rose-600 hover:bg-rose-100 dark:bg-rose-950/30 dark:hover:bg-rose-950/50 dark:text-rose-400 border border-rose-200 dark:border-rose-800/50 transition-all"
+              className="w-full py-2.5 rounded-xl text-sm font-semibold bg-rose-50 text-rose-600 hover:bg-rose-100 dark:bg-rose-950/30 dark:hover:bg-rose-950/50 dark:text-rose-400 border border-rose-200 dark:border-rose-800/50 transition-colors"
             >
               Sign Out of System
             </button>

@@ -1,15 +1,16 @@
 {
-  "latestVersion": "1.4.6",
+  "latestVersion": "1.4.7",
   "releaseDate": "23 September 2026",
   "releaseNotes": [
-    "🖼️ Updated WhatsApp reminder template to official approved scenic header banner",
-    "💻 Synchronized desktop Windows application and web client with latest WhatsApp Cloud API templates",
-    "⚡ Seamless in-app real-time OTA updates without package downloads"
+    "🛡️ Fixed application flickering during password change and button interactions",
+    "⚡ Eliminated rendering artifacts caused by CSS transitions and GPU compositing conflicts",
+    "🔄 Optimized update polling interval from 30s to 5 minutes for smoother performance",
+    "🎨 Replaced expensive backdrop-blur effects with performant solid backgrounds"
   ],
   "downloadUrl": "https://github.com/futuredrivingschool9620-create/Future-driving-school/releases/download/v1.4.2/Future-Driving-School-Setup-1.4.2.exe",
   "installerUrl": "https://github.com/futuredrivingschool9620-create/Future-driving-school/releases/download/v1.4.2/Future-Driving-School-Setup-1.4.2.exe",
   "updateBundleUrl": "https://raw.githubusercontent.com/futuredrivingschool9620-create/Future-driving-school/main/update-bundle.zip",
   "mandatory": false,
   "minSupportedVersion": "1.0.0",
-  "buildId": "1.4.6"
+  "buildId": "1.4.7"
 }

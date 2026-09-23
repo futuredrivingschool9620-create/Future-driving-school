@@ -74,8 +74,6 @@
     margin: 0;
     padding: 0;
     box-sizing: border-box;
-    -webkit-backface-visibility: hidden;
-    backface-visibility: hidden;
   }
 
   html {
@@ -120,21 +118,19 @@
 
 @layer components {
   .glass-card {
-    background: rgba(255, 255, 255, 0.8);
-    backdrop-filter: blur(12px);
+    background: #ffffffee;
     border: 1px solid var(--color-border);
     border-radius: 16px;
     box-shadow: 0 4px 6px -1px var(--color-card-shadow), 0 2px 4px -2px var(--color-card-shadow);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    transition: box-shadow 0.2s ease;
   }
 
   .dark .glass-card {
-    background: rgba(30, 41, 59, 0.8);
+    background: #1e293bee;
   }
 
   .glass-card:hover {
     box-shadow: 0 10px 15px -3px var(--color-card-shadow), 0 4px 6px -4px var(--color-card-shadow);
-    transform: translateY(-1px);
   }
 
   .status-pulse {
@@ -149,8 +145,7 @@
   }
 
   .page-enter {
-    animation: fadeInUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-    will-change: transform, opacity;
+    animation: fadeInUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 
   .shimmer {

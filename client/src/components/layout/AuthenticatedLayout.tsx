@@ -170,8 +170,8 @@ export default function AuthenticatedLayout() {
   useEffect(() => {
     checkForUpdates();
 
-    // Periodic check every 30 seconds
-    const interval = setInterval(checkForUpdates, 30 * 1000);
+    // Periodic check every 5 minutes (reduced from 30s to prevent UI flicker)
+    const interval = setInterval(checkForUpdates, 5 * 60 * 1000);
 
     // Check when user switches back to this tab / window
     const handleVisibilityChange = () => {
@@ -278,7 +278,7 @@ export default function AuthenticatedLayout() {
     <div className="flex min-h-screen bg-[var(--color-bg-primary)]">
       {/* Sidebar */}
       <aside
-        className={`fixed left-0 bottom-0 top-auto w-full h-auto z-30 flex flex-row overflow-x-auto transition-all duration-300 md:top-0 md:bottom-auto md:h-full md:flex-col md:overflow-visible ${
+        className={`fixed left-0 bottom-0 top-auto w-full h-auto z-30 flex flex-row overflow-x-auto md:transition-[width] md:duration-300 md:top-0 md:bottom-auto md:h-full md:flex-col md:overflow-visible ${
           sidebarCollapsed ? 'md:w-[72px]' : 'md:w-[260px]'
         }`}
         style={{ backgroundColor: 'var(--color-sidebar-bg)' }}
@@ -305,7 +305,7 @@ export default function AuthenticatedLayout() {
               end={item.path === '/'}
               title={item.label}
               className={({ isActive }) =>
-                `flex shrink-0 flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 px-3 py-2.5 md:py-2.5 rounded-xl text-[10px] md:text-sm font-medium transition-all duration-200 group ${
+                `flex shrink-0 flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 px-3 py-2.5 md:py-2.5 rounded-xl text-[10px] md:text-sm font-medium transition-colors duration-200 group ${
                   isActive
                     ? 'bg-teal-500/20 text-teal-300 shadow-lg shadow-teal-500/10'
                     : 'text-slate-400 hover:bg-white/5 hover:text-white'
@@ -360,12 +360,12 @@ export default function AuthenticatedLayout() {
 
       {/* Main Content */}
       <main
-        className={`min-w-0 flex-1 pb-20 md:pb-0 transition-all duration-300 ${
+        className={`min-w-0 flex-1 pb-20 md:pb-0 md:transition-[margin-left] md:duration-300 ${
           sidebarCollapsed ? 'md:ml-[72px]' : 'md:ml-[260px]'
         }`}
       >
         {/* Top Header */}
-        <header className="sticky top-0 z-20 backdrop-blur-lg border-b" style={{ borderColor: 'var(--color-border)', backgroundColor: 'color-mix(in srgb, var(--color-bg-primary) 80%, transparent)' }}>
+        <header className="sticky top-0 z-20 border-b" style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-bg-primary)' }}>
           <div className="flex items-center justify-between px-4 py-3 md:px-8 md:py-4">
             <div>
               <h2 className="text-xl font-bold" style={{ color: 'var(--color-text-primary)' }}>
@@ -385,7 +385,7 @@ export default function AuthenticatedLayout() {
             <div className="flex items-center gap-3">
               <NavLink
                 to="/settings"
-                className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold transition-all border shadow-sm group hover:scale-[1.02]"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold transition-colors border shadow-sm group"
                 style={{
                   backgroundColor: hasUpdate ? 'rgba(245, 158, 11, 0.12)' : 'rgba(16, 185, 129, 0.12)',
                   borderColor: hasUpdate ? 'rgba(245, 158, 11, 0.3)' : 'rgba(16, 185, 129, 0.3)',

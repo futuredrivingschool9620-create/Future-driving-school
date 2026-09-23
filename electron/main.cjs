@@ -4,10 +4,12 @@ const fs = require('fs');
 const { spawn } = require('child_process');
 const http = require('http');
 
-// Disable hardware acceleration to eliminate screen flickering, black flashes, and visual artifacts on Windows
+// Disable hardware acceleration to eliminate visual artifacts on Windows
 app.disableHardwareAcceleration();
 app.commandLine.appendSwitch('disable-gpu-compositing');
-app.commandLine.appendSwitch('disable-software-rasterizer');
+app.commandLine.appendSwitch('disable-gpu-vsync');
+app.commandLine.appendSwitch('force-color-profile', 'srgb');
+app.commandLine.appendSwitch('wm-window-animations-disabled');
 app.commandLine.appendSwitch('allow-file-access-from-files');
 app.commandLine.appendSwitch('disable-web-security');
 
