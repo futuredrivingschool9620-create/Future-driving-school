@@ -1,6 +1,6 @@
 {
   "name": "future-driving-school",
-  "version": "1.4.7",
+  "version": "1.4.8",
   "description": "Future Driving School - Windows Desktop Management Application",
   "main": "electron/main.cjs",
   "private": true,

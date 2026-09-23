@@ -8,14 +8,6 @@ import SEO from '../../components/shared/SEO';
 export default function SettingsPage() {
   const { logout, admin } = useAuth();
 
-  // Change password state
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [passwordError, setPasswordError] = useState('');
-  const [passwordSuccess, setPasswordSuccess] = useState('');
-  const [isChangingPassword, setIsChangingPassword] = useState(false);
-
   // Manual Trigger
   const [isTriggering, setIsTriggering] = useState(false);
   const [triggerMsg, setTriggerMsg] = useState('');
@@ -331,50 +323,6 @@ export default function SettingsPage() {
     } catch (err: any) {
       setUpdateStep('error');
       setUpdateMsg(`❌ Failed to install update: ${err.message || 'Unknown error'}`);
-    }
-  };
-
-  const handleChangePassword = async (e: FormEvent) => {
-    e.preventDefault();
-    setPasswordError('');
-    setPasswordSuccess('');
-
-    if (newPassword !== confirmPassword) {
-      setPasswordError('Passwords do not match');
-      return;
-    }
-
-    if (newPassword.length < 8) {
-      setPasswordError('Password must be at least 8 characters');
-      return;
-    }
-
-    setIsChangingPassword(true);
-    try {
-      const result = await authApi.changePassword({
-        currentPassword,
-        newPassword,
-        confirmPassword,
-      });
-      setPasswordSuccess(result.message);
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-      setTimeout(() => {
-        if (typeof window !== 'undefined' && (window.location.protocol === 'file:' || window.location.hash)) {
-          window.location.hash = '#/login';
-        } else {
-          window.location.href = '/login';
-        }
-      }, 2000);
-    } catch (err: unknown) {
-      const message =
-        err && typeof err === 'object' && 'response' in err
-          ? (err as { response?: { data?: { error?: string } } }).response?.data?.error || 'Failed to change password'
-          : 'Network error';
-      setPasswordError(message);
-    } finally {
-      setIsChangingPassword(false);
     }
   };
 
@@ -801,76 +749,8 @@ export default function SettingsPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Change Password */}
-        <div className="glass-card p-6">
-          <h3 className="text-lg font-bold mb-1" style={{ color: 'var(--color-text-primary)' }}>
-            Change Admin Password
-          </h3>
-          <p className="text-sm mb-4" style={{ color: 'var(--color-text-muted)' }}>
-            Update credentials for user: <strong>{admin?.username}</strong>
-          </p>
-
-          <form onSubmit={handleChangePassword} className="space-y-3" id="change-password-form">
-            {passwordError && (
-              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs">
-                {passwordError}
-              </div>
-            )}
-            {passwordSuccess && (
-              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs">
-                {passwordSuccess}
-              </div>
-            )}
-
-            <div>
-              <label className="block text-xs font-semibold mb-1" style={{ color: 'var(--color-text-secondary)' }}>
-                Current Password
-              </label>
-              <input
-                type="password"
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                required
-                className="w-full px-3 py-2 rounded-lg text-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold mb-1" style={{ color: 'var(--color-text-secondary)' }}>
-                New Password (min 8 chars)
-              </label>
-              <input
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                required
-                minLength={8}
-                className="w-full px-3 py-2 rounded-lg text-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold mb-1" style={{ color: 'var(--color-text-secondary)' }}>
-                Confirm New Password
-              </label>
-              <input
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-                className="w-full px-3 py-2 rounded-lg text-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={isChangingPassword || !currentPassword || !newPassword || !confirmPassword}
-              className="w-full py-2.5 rounded-xl text-sm font-semibold bg-teal-600 text-white hover:bg-teal-700 transition-colors disabled:opacity-50"
-            >
-              {isChangingPassword ? 'Updating...' : 'Update Password'}
-            </button>
-          </form>
-        </div>
+        {/* Change Password - isolated component to eliminate re-renders on keystroke */}
+        <ChangePasswordCard username={admin?.username} />
 
         {/* Integration Status & Account */}
         <div className="space-y-6">
@@ -924,6 +804,131 @@ export default function SettingsPage() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function ChangePasswordCard({ username }: { username?: string }) {
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState('');
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+
+  const handleChangePassword = async (e: FormEvent) => {
+    e.preventDefault();
+    setPasswordError('');
+    setPasswordSuccess('');
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError('Passwords do not match');
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      setPasswordError('Password must be at least 8 characters');
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      const result = await authApi.changePassword({
+        currentPassword,
+        newPassword,
+        confirmPassword,
+      });
+      setPasswordSuccess(result.message);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setTimeout(() => {
+        if (typeof window !== 'undefined' && (window.location.protocol === 'file:' || window.location.hash)) {
+          window.location.hash = '#/login';
+        } else {
+          window.location.href = '/login';
+        }
+      }, 2000);
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === 'object' && 'response' in err
+          ? (err as { response?: { data?: { error?: string } } }).response?.data?.error || 'Failed to change password'
+          : 'Network error';
+      setPasswordError(message);
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
+  return (
+    <div className="glass-card p-6">
+      <h3 className="text-lg font-bold mb-1" style={{ color: 'var(--color-text-primary)' }}>
+        Change Admin Password
+      </h3>
+      <p className="text-sm mb-4" style={{ color: 'var(--color-text-muted)' }}>
+        Update credentials for user: <strong>{username}</strong>
+      </p>
+
+      <form onSubmit={handleChangePassword} className="space-y-3" id="change-password-form">
+        {passwordError && (
+          <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs">
+            {passwordError}
+          </div>
+        )}
+        {passwordSuccess && (
+          <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs">
+            {passwordSuccess}
+          </div>
+        )}
+
+        <div>
+          <label className="block text-xs font-semibold mb-1" style={{ color: 'var(--color-text-secondary)' }}>
+            Current Password
+          </label>
+          <input
+            type="password"
+            value={currentPassword}
+            onChange={(e) => setCurrentPassword(e.target.value)}
+            required
+            className="w-full px-3 py-2 rounded-lg text-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold mb-1" style={{ color: 'var(--color-text-secondary)' }}>
+            New Password (min 8 chars)
+          </label>
+          <input
+            type="password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            required
+            minLength={8}
+            className="w-full px-3 py-2 rounded-lg text-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold mb-1" style={{ color: 'var(--color-text-secondary)' }}>
+            Confirm New Password
+          </label>
+          <input
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            required
+            className="w-full px-3 py-2 rounded-lg text-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
+          />
+        </div>
+
+        <button
+          type="submit"
+          disabled={isChangingPassword || !currentPassword || !newPassword || !confirmPassword}
+          className="w-full py-2.5 rounded-xl text-sm font-semibold bg-teal-600 text-white hover:bg-teal-700 transition-colors disabled:opacity-50"
+        >
+          {isChangingPassword ? 'Updating...' : 'Update Password'}
+        </button>
+      </form>
     </div>
   );
 }

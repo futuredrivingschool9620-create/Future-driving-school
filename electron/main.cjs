@@ -4,12 +4,9 @@ const fs = require('fs');
 const { spawn } = require('child_process');
 const http = require('http');
 
-// Disable hardware acceleration to eliminate visual artifacts on Windows
-app.disableHardwareAcceleration();
-app.commandLine.appendSwitch('disable-gpu-compositing');
-app.commandLine.appendSwitch('disable-gpu-vsync');
-app.commandLine.appendSwitch('force-color-profile', 'srgb');
-app.commandLine.appendSwitch('wm-window-animations-disabled');
+// Enable optimal hardware acceleration and GPU compositing on Windows
+app.commandLine.appendSwitch('high-dpi-support', '1');
+app.commandLine.appendSwitch('enable-gpu-rasterization');
 app.commandLine.appendSwitch('allow-file-access-from-files');
 app.commandLine.appendSwitch('disable-web-security');
 

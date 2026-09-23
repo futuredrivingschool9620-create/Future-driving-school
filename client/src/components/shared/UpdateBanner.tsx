@@ -36,7 +36,7 @@ export const UpdateBanner: React.FC<UpdateBannerProps> = ({
       className="fixed top-4 right-4 z-50 max-w-sm w-[calc(100vw-2rem)] sm:w-auto animate-slide-down"
     >
       <div className="rounded-2xl p-0.5 shadow-2xl bg-gradient-to-r from-teal-500 via-indigo-500 to-emerald-500">
-        <div className="p-4 rounded-[14px] bg-slate-950/95 backdrop-blur-xl border border-white/10 text-white flex flex-col gap-3">
+        <div className="p-4 rounded-[14px] bg-slate-950 border border-white/10 text-white flex flex-col gap-3">
           <div className="flex items-start gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-teal-500 to-indigo-500 flex items-center justify-center text-xl shadow-lg shadow-teal-500/30 shrink-0">
               🔔

@@ -415,7 +415,7 @@ export default function AuthenticatedLayout() {
         )}
 
         {/* Page Content */}
-        <div className="p-4 md:p-8 page-enter">
+        <div className="p-4 md:p-8">
           <Outlet />
         </div>
       </main>

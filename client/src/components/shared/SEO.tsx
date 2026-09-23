@@ -14,7 +14,9 @@ export function useSEO({ title, description, canonical }: SEOProps = {}) {
   useEffect(() => {
     // 1. Update Document Title
     const formattedTitle = title ? `${title} | Future Driving School` : DEFAULT_TITLE;
-    document.title = formattedTitle;
+    if (document.title !== formattedTitle) {
+      document.title = formattedTitle;
+    }
 
     // 2. Update Meta Description
     const metaDesc = document.querySelector('meta[name="description"]');
