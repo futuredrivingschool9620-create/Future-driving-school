@@ -91,4 +91,15 @@ export class DocumentController {
       next(error);
     }
   }
+
+  static async logReminder(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const adminId = req.admin?.adminId || 'admin';
+      const { messageId, phoneNumber } = req.body;
+      const result = await DocumentService.logReminder(getParam(req, 'id'), adminId, messageId, phoneNumber, getIp(req));
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
 }

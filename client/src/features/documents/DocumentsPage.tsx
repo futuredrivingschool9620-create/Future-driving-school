@@ -172,7 +172,7 @@ export default function DocumentsPage() {
     try {
       setSendingDocId(doc.id);
       setAlertNotice(null);
-      const res = await documentApi.sendReminder(doc.id);
+      const res = await documentApi.sendReminder(doc.id, doc);
       setAlertNotice({
         type: 'success',
         message: res.message || `✅ WhatsApp reminder sent to ${doc.customer.firstName} (${doc.customer.phoneNumber})!`,

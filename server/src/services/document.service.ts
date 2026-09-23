@@ -648,4 +648,117 @@ export class DocumentService {
       phoneNumber,
     };
   }
+
+  static async logReminder(
+    id: string,
+    adminId: string,
+    messageId?: string,
+    phoneNumberOverride?: string,
+    ipAddress?: string
+  ) {
+    const document = await prisma.document.findUnique({
+      where: { id },
+      include: { customer: true, vehicle: true },
+    });
+
+    if (!document) {
+      throw new NotFoundError('Document not found');
+    }
+
+    const customerName = [document.customer?.firstName, document.customer?.secondName].filter(Boolean).join(' ') || 'Customer';
+    const vehicleNumber = document.vehicle?.vehicleNumber || document.customer?.vehicleNumber || 'Vehicle';
+    const phoneNumber = phoneNumberOverride || document.customer?.phoneNumber || '';
+    const daysRemaining = getDaysRemaining(document.endDate);
+    const today = getTodayIST();
+    const reminderTypeStr = (getReminderType(daysRemaining) || 'MANUAL') as any;
+    const message = `Future Driving School reminder for ${document.documentName} (${vehicleNumber})`;
+    const now = new Date();
+    const sentTime = now.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' });
+
+    try {
+      const existing = await prisma.notification.findFirst({
+        where: {
+          customerId: document.customerId,
+          documentId: document.id,
+          reminderType: reminderTypeStr,
+          currentExpiryDate: document.endDate,
+          calendarDay: today,
+        },
+      });
+
+      if (existing) {
+        await prisma.notification.update({
+          where: { id: existing.id },
+          data: {
+            notificationStatus: 'SENT',
+            deliveryStatus:     'SENT',
+            sentDate:           now,
+            sentTime,
+            providerMessageId:  messageId,
+            message,
+          },
+        });
+      } else {
+        await prisma.notification.create({
+          data: {
+            customerId:         document.customerId,
+            vehicleId:          document.vehicleId || null,
+            documentId:         document.id,
+            customerName,
+            phoneNumber,
+            vehicleNumber,
+            documentType:       document.documentName,
+            originalExpiryDate: document.endDate,
+            currentExpiryDate:  document.endDate,
+            reminderType:       reminderTypeStr,
+            message,
+            calendarDay:        today,
+            notificationStatus: 'SENT',
+            deliveryStatus:     'SENT',
+            sentDate:           now,
+            sentTime,
+            providerMessageId:  messageId,
+          },
+        });
+      }
+    } catch (dbErr) {
+      console.warn('[logReminder] DB Notification record update/create non-fatal error:', dbErr);
+    }
+
+    if (daysRemaining <= 0 && document.vehicleId) {
+      try {
+        await prisma.vehicle.update({
+          where: { id: document.vehicleId },
+          data: { status: 'Expired', updatedByAdminId: adminId },
+        });
+      } catch (vehErr) {
+        console.warn('[logReminder] Could not update vehicle status:', vehErr);
+      }
+    }
+
+    try {
+      await AuditService.log({
+        adminId,
+        entityType: 'Document',
+        entityId: id,
+        action: 'UPDATE',
+        newData: { manualReminderSent: true, messageId, to: phoneNumber },
+        ipAddress,
+      });
+    } catch (auditErr) {
+      console.warn('[logReminder] Audit log error:', auditErr);
+    }
+
+    try {
+      SSEService.broadcast({ type: 'DOCUMENT_UPDATE', data: { documentId: id, customerId: document.customerId } });
+    } catch (sseErr) {
+      console.warn('[logReminder] SSE broadcast error:', sseErr);
+    }
+
+    return {
+      success: true,
+      message: `WhatsApp reminder logged for ${customerName} (${phoneNumber})`,
+      messageId,
+    };
+  }
 }

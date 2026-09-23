@@ -467,8 +467,132 @@ export const documentApi = {
     return `${API_BASE}/documents/uploaded-pdfs/${id}/download`;
   },
 
-  sendReminder: async (id: string): Promise<{ success: boolean; message: string; messageId?: string }> => {
-    const { data } = await api.post<{ success: boolean; message: string; messageId?: string }>(`/documents/${id}/send-reminder`);
+  sendReminder: async (
+    id: string,
+    docData?: any
+  ): Promise<{ success: boolean; message: string; messageId?: string }> => {
+    // 1. Resolve document details either from passed object or via API
+    let doc = docData;
+    if (!doc?.customer?.phoneNumber) {
+      try {
+        doc = await documentApi.getById(id);
+      } catch (err) {
+        console.warn('[sendReminder] Could not pre-fetch document:', err);
+      }
+    }
+
+    const rawPhone = doc?.customer?.phoneNumber;
+    if (rawPhone) {
+      const customerName = [doc?.customer?.firstName, doc?.customer?.secondName].filter(Boolean).join(' ') || 'Customer';
+      const vehicleNumber = doc?.vehicle?.vehicleNumber || doc?.customer?.vehicleNumber || 'Vehicle';
+      const documentName = doc?.documentName || 'Document';
+      const daysRemaining = typeof doc?.daysRemaining === 'number' ? doc.daysRemaining : 0;
+      const daysStr =
+        daysRemaining === 0 ? '0 days (TODAY)'
+        : daysRemaining === 1 ? '1 day (TOMORROW)'
+        : daysRemaining > 1 ? `${daysRemaining} days`
+        : `EXPIRED (${Math.abs(daysRemaining)} days ago)`;
+
+      const formattedDate = doc?.endDate
+        ? new Date(doc.endDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+        : '';
+
+      let cleanPhone = rawPhone.replace(/\D/g, '');
+      if (cleanPhone.length === 10) {
+        cleanPhone = '91' + cleanPhone;
+      }
+
+      const WHATSAPP_API_URL = 'https://graph.facebook.com/v25.0';
+      const WHATSAPP_PHONE_NUMBER_ID = '1337951776062823';
+      const WHATSAPP_API_TOKEN =
+        'EAAUurdeulKcBSWjSZC3SNPCSmaFwz8rr2XsQzb9GW3eBv6eZBMabKjHoF8w1I1PGM33lrw9ZCd6KPC4PBQilzAnCnn49ue8nXDHwIjlZC9YqCdNksOZAyGNfNNFozaDg48ZCEpoAYneWEPRyCUGccPPlHZChn6Ihsejz4EHmOGL3XMSszmA8RzaqOpTEDwGrnS1kwZDZD';
+      const WHATSAPP_TEMPLATE_NAME = 'future_driving_school';
+      const BANNER_URL =
+        'https://raw.githubusercontent.com/futuredrivingschool9620-create/Future-driving-school/main/client/public/whatsapp-banner.png';
+
+      try {
+        const metaRes = await fetch(`${WHATSAPP_API_URL}/${WHATSAPP_PHONE_NUMBER_ID}/messages`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${WHATSAPP_API_TOKEN}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            messaging_product: 'whatsapp',
+            to: cleanPhone,
+            type: 'template',
+            template: {
+              name: WHATSAPP_TEMPLATE_NAME,
+              language: { code: 'en' },
+              components: [
+                {
+                  type: 'header',
+                  parameters: [
+                    {
+                      type: 'image',
+                      image: { link: BANNER_URL },
+                    },
+                  ],
+                },
+                {
+                  type: 'body',
+                  parameters: [
+                    { type: 'text', text: customerName },
+                    { type: 'text', text: vehicleNumber },
+                    { type: 'text', text: documentName },
+                    { type: 'text', text: formattedDate },
+                    { type: 'text', text: daysStr },
+                  ],
+                },
+              ],
+            },
+          }),
+        });
+
+        if (metaRes.ok) {
+          const metaData = (await metaRes.json()) as { messages?: Array<{ id: string }> };
+          const messageId = metaData.messages?.[0]?.id;
+
+          // Attempt non-blocking DB log on supporting servers
+          try {
+            await api.post(`/documents/${id}/log-reminder`, {
+              messageId,
+              phoneNumber: rawPhone,
+            });
+          } catch {
+            // Silently ignore if running on older local server build
+          }
+
+          invalidateClientCache('/notifications');
+          invalidateClientCache('/dashboard');
+          invalidateClientCache('/documents');
+
+          return {
+            success: true,
+            message: `✅ WhatsApp reminder sent to ${customerName} (${rawPhone}) with official banner!`,
+            messageId,
+          };
+        } else {
+          const errText = await metaRes.text();
+          console.error('[sendReminder] Direct Meta WhatsApp error:', metaRes.status, errText);
+          throw new Error(`WhatsApp API error: ${metaRes.status} - ${errText}`);
+        }
+      } catch (directErr: any) {
+        console.error('[sendReminder] Direct WhatsApp send failed:', directErr);
+        // Fall back to server endpoint only if direct send errored out
+        const { data } = await api.post<{ success: boolean; message: string; messageId?: string }>(
+          `/documents/${id}/send-reminder`
+        );
+        invalidateClientCache('/notifications');
+        invalidateClientCache('/dashboard');
+        return data;
+      }
+    }
+
+    // Fallback if no phone could be found
+    const { data } = await api.post<{ success: boolean; message: string; messageId?: string }>(
+      `/documents/${id}/send-reminder`
+    );
     invalidateClientCache('/notifications');
     invalidateClientCache('/dashboard');
     return data;

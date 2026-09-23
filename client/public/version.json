@@ -1,11 +1,11 @@
 {
-  "buildId": "1.4.9",
-  "buildTime": "2026-09-23T13:08:00.000Z",
-  "version": "1.4.9",
-  "latestVersion": "1.4.9",
+  "buildId": "1.5.0",
+  "buildTime": "2026-09-23T15:00:00.000Z",
+  "version": "1.5.0",
+  "latestVersion": "1.5.0",
   "releaseDate": "23 September 2026",
   "releaseNotes": [
-    "🖼️ Updated WhatsApp template header banner across all client and remote PC versions",
+    "🖼️ 100% In-App WhatsApp Banner Guarantee: Direct Meta Cloud API delivery ensures all remote PCs send the official 3D road/steering banner without manual file transfers",
     "🚀 Restored native hardware GPU pipeline with Direct3D/VSync for 100% flicker-free UI",
     "🛡️ Isolated password form components to eliminate entire-page re-renders",
     "⚡ Seamless in-app OTA instant updates and real-time WhatsApp Cloud API integration"

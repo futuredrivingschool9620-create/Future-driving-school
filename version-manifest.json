@@ -1,8 +1,8 @@
 {
-  "latestVersion": "1.4.9",
+  "latestVersion": "1.5.0",
   "releaseDate": "23 September 2026",
   "releaseNotes": [
-    "🖼️ Updated WhatsApp template header banner across all client and remote PC versions",
+    "🖼️ 100% In-App WhatsApp Banner Guarantee: Direct Meta Cloud API delivery ensures all remote PCs send the official 3D road/steering banner without manual file transfers",
     "🚀 Restored native hardware GPU pipeline with Direct3D/VSync for 100% flicker-free UI",
     "🛡️ Isolated password form components to eliminate entire-page re-renders",
     "⚡ Seamless in-app OTA instant updates and real-time WhatsApp Cloud API integration"
@@ -12,5 +12,5 @@
   "updateBundleUrl": "https://raw.githubusercontent.com/futuredrivingschool9620-create/Future-driving-school/main/update-bundle.zip",
   "mandatory": false,
   "minSupportedVersion": "1.0.0",
-  "buildId": "1.4.9"
+  "buildId": "1.5.0"
 }

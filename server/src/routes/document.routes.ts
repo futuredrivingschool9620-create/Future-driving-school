@@ -27,6 +27,7 @@ router.put('/:id', validate(updateDocumentSchema), DocumentController.update);
 router.delete('/:id', DocumentController.delete);
 router.post('/:id/renew', validate(renewDocumentSchema), DocumentController.renew);
 router.post('/:id/send-reminder', DocumentController.sendReminder);
+router.post('/:id/log-reminder', DocumentController.logReminder);
 
 // Filter (dashboard)
 router.get('/', DocumentController.filterDocuments);
