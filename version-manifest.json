@@ -1,17 +1,16 @@
 {
-  "latestVersion": "1.4.8",
+  "latestVersion": "1.4.9",
   "releaseDate": "23 September 2026",
   "releaseNotes": [
-    "🚀 Restored native hardware-accelerated GPU pipeline with Direct3D/VSync",
-    "🛡️ Fully isolated password change form to eliminate entire-page re-renders",
-    "✨ Removed layout-level opacity animation to permanently eliminate UI flashing",
-    "🎨 Replaced remaining backdrop-blur effects with solid rendering",
-    "⚡ Butter-smooth button hover, typing, and navigation performance"
+    "🖼️ Updated WhatsApp template header banner across all client and remote PC versions",
+    "🚀 Restored native hardware GPU pipeline with Direct3D/VSync for 100% flicker-free UI",
+    "🛡️ Isolated password form components to eliminate entire-page re-renders",
+    "⚡ Seamless in-app OTA instant updates and real-time WhatsApp Cloud API integration"
   ],
   "downloadUrl": "https://github.com/futuredrivingschool9620-create/Future-driving-school/releases/download/v1.4.2/Future-Driving-School-Setup-1.4.2.exe",
   "installerUrl": "https://github.com/futuredrivingschool9620-create/Future-driving-school/releases/download/v1.4.2/Future-Driving-School-Setup-1.4.2.exe",
   "updateBundleUrl": "https://raw.githubusercontent.com/futuredrivingschool9620-create/Future-driving-school/main/update-bundle.zip",
   "mandatory": false,
   "minSupportedVersion": "1.0.0",
-  "buildId": "1.4.8"
+  "buildId": "1.4.9"
 }
