@@ -1,13 +1,12 @@
 {
-  "buildId": "1.4.5",
-  "buildTime": "2026-09-21T13:31:00.000Z",
-  "version": "1.4.5",
-  "latestVersion": "1.4.5",
-  "releaseDate": "21 September 2026",
+  "buildId": "1.4.6",
+  "buildTime": "2026-09-23T09:20:00.000Z",
+  "version": "1.4.6",
+  "latestVersion": "1.4.6",
+  "releaseDate": "23 September 2026",
   "releaseNotes": [
-    "✨ Complete SEO optimization, OpenGraph, Twitter Cards, and Schema.org JSON-LD",
-    "🛡️ Resolved app flickering, screen tearing, and window stuttering on Windows",
-    "🗑️ Complete renewal deletion suite (Date Range, Multi-Select, and Single Row)",
+    "🖼️ Updated WhatsApp reminder template to official approved scenic header banner",
+    "💻 Synchronized desktop Windows application and web client with latest WhatsApp Cloud API templates",
     "⚡ Seamless in-app real-time OTA updates without package downloads"
   ],
   "downloadUrl": "https://github.com/futuredrivingschool9620-create/Future-driving-school/releases/download/v1.4.2/Future-Driving-School-Setup-1.4.2.exe"
