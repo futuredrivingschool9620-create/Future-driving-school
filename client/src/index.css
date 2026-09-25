@@ -128,15 +128,13 @@
 }
 
 @layer components {
-  /* 100% Solid Opaque Cards with isolated paint containment to eliminate re-render flickering */
+  /* 100% Solid Opaque Cards without transparency subpixel blending jitter */
   .glass-card {
     background: var(--color-bg-secondary);
     border: 1px solid var(--color-border);
     border-radius: 16px;
     box-shadow: 0 4px 6px -1px var(--color-card-shadow), 0 2px 4px -2px var(--color-card-shadow);
     transition: box-shadow 0.2s ease;
-    isolation: isolate;
-    contain: paint;
   }
 
   .dark .glass-card {

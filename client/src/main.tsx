@@ -1,13 +1,25 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
+import { logDiagnostic } from './lib/diagnostics';
 
 window.addEventListener('error', (event) => {
   console.error('[Global Error]:', event.error || event.message);
+  logDiagnostic({
+    category: 'unhandled',
+    message: event.message || 'Uncaught window error',
+    details: event.error?.stack || `${event.filename}:${event.lineno}:${event.colno}`,
+  });
 });
 
 window.addEventListener('unhandledrejection', (event) => {
   console.error('[Unhandled Promise Rejection]:', event.reason);
+  const reasonMsg = event.reason?.message || String(event.reason || 'Unhandled Promise rejection');
+  logDiagnostic({
+    category: 'unhandled',
+    message: reasonMsg,
+    details: event.reason?.stack,
+  });
 });
 
 try {

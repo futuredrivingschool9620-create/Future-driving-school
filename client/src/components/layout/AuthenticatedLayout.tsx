@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import logoImg from '../../preset/WhatsApp.jpeg';
 import { UpdateBanner } from '../shared/UpdateBanner';
 import { appApi, safeStorage, safeSessionStorage } from '../../lib/api';
+import ErrorBoundary from '../shared/ErrorBoundary';
 
 const navItems = [
   {
@@ -421,7 +422,9 @@ export default function AuthenticatedLayout() {
 
         {/* Page Content */}
         <div className="p-4 md:p-8">
-          <Outlet />
+          <ErrorBoundary>
+            <Outlet />
+          </ErrorBoundary>
         </div>
       </main>
     </div>

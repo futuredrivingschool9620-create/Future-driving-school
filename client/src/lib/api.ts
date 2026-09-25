@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { logDiagnostic } from './diagnostics';
 import type {
   AuthResponse,
   AdminProfile,
@@ -102,23 +103,60 @@ export const safeSessionStorage = {
 // ── Token Management ──
 
 const TOKEN_STORAGE_KEY = 'fds_access_token';
+const REFRESH_TOKEN_STORAGE_KEY = 'fds_refresh_token';
 
-let accessToken: string | null = safeStorage.getItem(TOKEN_STORAGE_KEY);
+let accessToken: string | null = safeStorage.getItem(TOKEN_STORAGE_KEY) || safeSessionStorage.getItem(TOKEN_STORAGE_KEY);
 
-export function setAccessToken(token: string | null) {
+export function setAccessToken(token: string | null, rememberMe?: boolean) {
   accessToken = token;
   if (token) {
-    safeStorage.setItem(TOKEN_STORAGE_KEY, token);
+    if (rememberMe) {
+      safeStorage.setItem(TOKEN_STORAGE_KEY, token);
+      safeSessionStorage.removeItem(TOKEN_STORAGE_KEY);
+    } else {
+      safeSessionStorage.setItem(TOKEN_STORAGE_KEY, token);
+      // If rememberMe wasn't explicitly false, keep local storage consistent
+      if (rememberMe === undefined && safeStorage.getItem(TOKEN_STORAGE_KEY)) {
+        safeStorage.setItem(TOKEN_STORAGE_KEY, token);
+      }
+    }
   } else {
     safeStorage.removeItem(TOKEN_STORAGE_KEY);
+    safeSessionStorage.removeItem(TOKEN_STORAGE_KEY);
   }
 }
 
 export function getAccessToken(): string | null {
   if (!accessToken) {
-    accessToken = safeStorage.getItem(TOKEN_STORAGE_KEY);
+    accessToken = safeStorage.getItem(TOKEN_STORAGE_KEY) || safeSessionStorage.getItem(TOKEN_STORAGE_KEY);
   }
   return accessToken;
+}
+
+export function setRefreshToken(token: string | null, rememberMe?: boolean) {
+  if (token) {
+    if (rememberMe) {
+      safeStorage.setItem(REFRESH_TOKEN_STORAGE_KEY, token);
+      safeSessionStorage.removeItem(REFRESH_TOKEN_STORAGE_KEY);
+    } else if (rememberMe === false) {
+      safeSessionStorage.setItem(REFRESH_TOKEN_STORAGE_KEY, token);
+      safeStorage.removeItem(REFRESH_TOKEN_STORAGE_KEY);
+    } else {
+      // Preserve existing storage preference
+      if (safeStorage.getItem(REFRESH_TOKEN_STORAGE_KEY)) {
+        safeStorage.setItem(REFRESH_TOKEN_STORAGE_KEY, token);
+      } else {
+        safeSessionStorage.setItem(REFRESH_TOKEN_STORAGE_KEY, token);
+      }
+    }
+  } else {
+    safeStorage.removeItem(REFRESH_TOKEN_STORAGE_KEY);
+    safeSessionStorage.removeItem(REFRESH_TOKEN_STORAGE_KEY);
+  }
+}
+
+export function getRefreshToken(): string | null {
+  return safeStorage.getItem(REFRESH_TOKEN_STORAGE_KEY) || safeSessionStorage.getItem(REFRESH_TOKEN_STORAGE_KEY);
 }
 
 // Request interceptor — attach access token
@@ -130,7 +168,7 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Response interceptor — auto-refresh on 401
+// Response interceptor — auto-refresh on 401 with dual-token fallback
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -145,17 +183,27 @@ api.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
+        const storedRefreshToken = getRefreshToken();
         const { data } = await axios.post<AuthResponse>(
           `${API_BASE}/auth/refresh`,
-          {},
+          { refreshToken: storedRefreshToken },
           { withCredentials: true }
         );
         setAccessToken(data.accessToken);
+        if (data.refreshToken) {
+          setRefreshToken(data.refreshToken);
+        }
         originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
         return api(originalRequest);
       } catch {
-        // Refresh failed — clear token, user needs to re-login
+        logDiagnostic({
+          category: 'auth',
+          endpoint: '/auth/refresh',
+          status: 401,
+          message: 'Refresh token expired or invalid; requiring user login',
+        });
         setAccessToken(null);
+        setRefreshToken(null);
         if (typeof window !== 'undefined') {
           if (window.location.protocol === 'file:' || window.location.hash) {
             window.location.hash = '#/login';
@@ -165,6 +213,18 @@ api.interceptors.response.use(
         }
         return Promise.reject(error);
       }
+    }
+
+    const status = error.response?.status;
+    const url = error.config?.url;
+    const errMsg = error.response?.data?.error || error.response?.data?.message || error.message || 'Request failed';
+    if (status !== 401 || originalRequest._retry) {
+      logDiagnostic({
+        category: status === 401 || status === 403 ? 'auth' : 'api',
+        endpoint: url,
+        status,
+        message: errMsg,
+      });
     }
 
     return Promise.reject(error);
@@ -181,6 +241,22 @@ interface CacheEntry<T> {
 const memoryCache = new Map<string, CacheEntry<any>>();
 const inFlightRequests = new Map<string, Promise<any>>();
 const DEFAULT_CACHE_TTL_MS = 60_000; // 60 seconds default TTL
+const MAX_CACHE_ENTRIES = 50; // Bound memory footprint
+
+function pruneMemoryCache() {
+  const now = Date.now();
+  for (const [key, entry] of memoryCache.entries()) {
+    if (now - entry.timestamp > 120_000) {
+      memoryCache.delete(key);
+    }
+  }
+  if (memoryCache.size > MAX_CACHE_ENTRIES) {
+    const keysToDelete = Array.from(memoryCache.keys()).slice(0, memoryCache.size - MAX_CACHE_ENTRIES);
+    for (const key of keysToDelete) {
+      memoryCache.delete(key);
+    }
+  }
+}
 
 export function invalidateClientCache(urlPattern?: string | RegExp) {
   if (!urlPattern) {
@@ -230,6 +306,7 @@ export async function cachedGet<T>(
   const promise = (async () => {
     try {
       const { data } = await api.get<T>(url, { params });
+      pruneMemoryCache();
       memoryCache.set(cacheKey, { data, timestamp: Date.now() });
       return data;
     } finally {
@@ -246,26 +323,38 @@ export async function cachedGet<T>(
 export const authApi = {
   login: async (username: string, password: string, rememberMe: boolean = false): Promise<AuthResponse> => {
     const { data } = await api.post<AuthResponse>('/auth/login', { username, password, rememberMe });
-    setAccessToken(data.accessToken);
+    setAccessToken(data.accessToken, rememberMe);
+    if (data.refreshToken) {
+      setRefreshToken(data.refreshToken, rememberMe);
+    }
     invalidateClientCache();
     return data;
   },
 
   refresh: async (): Promise<AuthResponse> => {
-    const { data } = await api.post<AuthResponse>('/auth/refresh');
+    const storedRefreshToken = getRefreshToken();
+    const { data } = await api.post<AuthResponse>('/auth/refresh', { refreshToken: storedRefreshToken });
     setAccessToken(data.accessToken);
+    if (data.refreshToken) {
+      setRefreshToken(data.refreshToken);
+    }
     return data;
   },
 
   logout: async (): Promise<void> => {
-    await api.post('/auth/logout');
+    const storedRefreshToken = getRefreshToken();
+    try {
+      await api.post('/auth/logout', { refreshToken: storedRefreshToken });
+    } catch {}
     setAccessToken(null);
+    setRefreshToken(null);
     invalidateClientCache();
   },
 
   changePassword: async (input: ChangePasswordInput): Promise<{ message: string }> => {
     const { data } = await api.put<{ message: string }>('/auth/change-password', input);
     setAccessToken(null);
+    setRefreshToken(null);
     invalidateClientCache();
     return data;
   },

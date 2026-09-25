@@ -5,12 +5,9 @@ const { spawn } = require('child_process');
 const http = require('http');
 
 // Hardware acceleration and Windows DWM compositing stabilization switches:
-// Disable DirectComposition and GPU rasterization to permanently eliminate MPO desync, screen tearing, and input-typing flicker on Windows
-app.commandLine.appendSwitch('disable-gpu-rasterization');
-app.commandLine.appendSwitch('disable-direct-composition');
-app.commandLine.appendSwitch('disable-direct-composition-video-overlays');
 app.commandLine.appendSwitch('high-dpi-support', '1');
 app.commandLine.appendSwitch('force-color-profile', 'srgb');
+app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
 app.commandLine.appendSwitch('allow-file-access-from-files');
 app.commandLine.appendSwitch('disable-web-security');
 
@@ -215,7 +212,20 @@ function createWindow() {
     }
   });
 
-  mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
+  mainWindow.webContents.on('render-process-gone', (_event, details) => {
+    console.error('[Electron] Renderer process gone:', details.reason, details.exitCode);
+    if (details.reason !== 'clean-exit') {
+      console.log('[Electron] Automatically reloading window after renderer crash...');
+      loadAppContent();
+    }
+  });
+
+  mainWindow.on('unresponsive', () => {
+    console.warn('[Electron] Window unresponsive, attempting to reload...');
+    loadAppContent();
+  });
+
+  mainWindow.webContents.on('console-message', (_event, _level, message) => {
     console.log(`[Renderer]: ${message}`);
   });
 
@@ -346,18 +356,33 @@ ipcMain.handle('apply-in-app-update', async (_event, updateUrl) => {
   }
 });
 
-app.whenReady().then(() => {
-  startServer();
-  waitForServer(() => {
-    createWindow();
-  });
+// Single instance lock to prevent duplicate instances from causing port 3001 conflicts & memory exhaustion
+const gotTheLock = app.requestSingleInstanceLock();
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
+if (!gotTheLock) {
+  console.log('[Electron] Another instance is already running. Quitting this duplicate process.');
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
     }
   });
-});
+
+  app.whenReady().then(() => {
+    startServer();
+    waitForServer(() => {
+      createWindow();
+    });
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        createWindow();
+      }
+    });
+  });
+}
 
 function killServer() {
   if (serverProcess && serverProcess.pid) {
@@ -384,4 +409,9 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   killServer();
 });
+
+process.on('exit', () => {
+  killServer();
+});
+
 

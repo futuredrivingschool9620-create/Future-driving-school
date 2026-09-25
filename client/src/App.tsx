@@ -1,14 +1,17 @@
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
+import ErrorBoundary from './components/shared/ErrorBoundary';
 import AppRouter from './router';
 import './index.css';
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <AppRouter />
-      </AuthProvider>
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider>
+        <AuthProvider>
+          <AppRouter />
+        </AuthProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }

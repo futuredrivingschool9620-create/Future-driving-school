@@ -34,6 +34,9 @@ export function authMiddleware(
     req.admin = payload;
     next();
   } catch (error) {
+    const timestamp = new Date().toISOString();
+    const reason = error instanceof UnauthorizedError ? error.message : 'Invalid or expired token';
+    console.warn(`[AUTH-FAILURE] [${timestamp}] [${req.method} ${req.originalUrl || req.url}] reason="${reason}"`);
     if (error instanceof UnauthorizedError) {
       next(error);
     } else {

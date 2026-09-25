@@ -16,17 +16,17 @@ export class AuthController {
       );
 
       // Set refresh token in HttpOnly cookie
-      // When rememberMe is false, omit maxAge to create a session cookie (cleared on browser close)
+      const isHttps = req.secure || req.headers['x-forwarded-proto'] === 'https';
       const cookieOptions: {
         httpOnly: boolean;
         secure: boolean;
-        sameSite: 'strict';
+        sameSite: 'strict' | 'lax';
         path: string;
         maxAge?: number;
       } = {
         httpOnly: true,
-        secure: env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        secure: isHttps,
+        sameSite: isHttps ? 'strict' : 'lax',
         path: '/api/auth',
       };
 
@@ -36,7 +36,7 @@ export class AuthController {
 
       res.cookie('refreshToken', refreshToken, cookieOptions);
 
-      res.json({ accessToken });
+      res.json({ accessToken, refreshToken });
     } catch (error) {
       next(error);
     }
@@ -44,7 +44,7 @@ export class AuthController {
 
   static async refresh(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const refreshToken = req.cookies?.refreshToken;
+      const refreshToken = req.body?.refreshToken || req.cookies?.refreshToken;
 
       if (!refreshToken) {
         res.status(401).json({ error: 'No refresh token provided' });
@@ -53,16 +53,17 @@ export class AuthController {
 
       const { accessToken, newRefreshToken } = await AuthService.refreshAccessToken(refreshToken);
 
+      const isHttps = req.secure || req.headers['x-forwarded-proto'] === 'https';
       // Set new refresh token cookie
       res.cookie('refreshToken', newRefreshToken, {
         httpOnly: true,
-        secure: env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        secure: isHttps,
+        sameSite: isHttps ? 'strict' : 'lax',
         maxAge: env.JWT_REFRESH_EXPIRY_DAYS * 24 * 60 * 60 * 1000,
         path: '/api/auth',
       });
 
-      res.json({ accessToken });
+      res.json({ accessToken, refreshToken: newRefreshToken });
     } catch (error) {
       next(error);
     }
@@ -70,7 +71,7 @@ export class AuthController {
 
   static async logout(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const refreshToken = req.cookies?.refreshToken;
+      const refreshToken = req.body?.refreshToken || req.cookies?.refreshToken;
       const ipAddress = getIp(req);
 
       if (refreshToken) {

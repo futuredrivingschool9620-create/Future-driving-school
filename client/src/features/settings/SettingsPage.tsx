@@ -202,6 +202,7 @@ export default function SettingsPage() {
     setDownloadStatus('Connecting to update server...');
     setUpdateMsg('');
 
+    let timer: ReturnType<typeof setInterval> | null = null;
     try {
       const bundleUrl =
         versionInfo?.updateBundleUrl ||
@@ -213,12 +214,12 @@ export default function SettingsPage() {
         setDownloadProgress(40);
         setDownloadStatus(`Downloading in-app update package for v${latestVer}...`);
 
-        const timer = setInterval(() => {
+        timer = setInterval(() => {
           setDownloadProgress((prev) => (prev < 90 ? prev + 10 : prev));
         }, 250);
 
         const res = await window.electronAPI.applyInAppUpdate(bundleUrl);
-        clearInterval(timer);
+        if (timer) clearInterval(timer);
 
         if (res.success) {
           setDownloadProgress(100);
@@ -270,6 +271,8 @@ export default function SettingsPage() {
       console.error('Update error:', err);
       setUpdateStep('error');
       setUpdateMsg(`❌ In-app update failed: ${err.message || 'Unknown error'}`);
+    } finally {
+      if (timer) clearInterval(timer);
     }
   };
 

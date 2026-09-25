@@ -1,14 +1,14 @@
 {
-  "buildId": "1.5.1",
-  "buildTime": "2026-09-25T12:00:00.000Z",
-  "version": "1.5.1",
-  "latestVersion": "1.5.1",
+  "buildId": "1.5.2",
+  "buildTime": "2026-09-25T13:40:00.000Z",
+  "version": "1.5.2",
+  "latestVersion": "1.5.2",
   "releaseDate": "25 September 2026",
   "releaseNotes": [
-    "🛡️ Permanently eliminated all UI flickering across data entry, forms, buttons, and page transitions",
-    "⚡ Optimized Skia layout rasterization with 100% solid opaque card paint containment",
-    "🖥️ Stabilized Windows DWM compositing and eliminated OS titlebar redraw flashes during navigation",
-    "🔄 Extended all-day session integrity and stabilized SSE connection lifecycle after long hours of continuous use"
+    "🖥️ Restored DirectComposition hardware rendering and eliminated white screen freezes on Windows",
+    "✨ Fixed card visibility across Home and Dashboard by eliminating paint containment conflicts",
+    "🛡️ Added global React ErrorBoundary with auto-recovery to permanently protect against blank screens",
+    "🔒 Enhanced null-safe customer and vehicle document rendering"
   ],
-  "downloadUrl": "https://github.com/futuredrivingschool9620-create/Future-driving-school/releases/download/v1.4.2/Future-Driving-School-Setup-1.4.2.exe"
+  "downloadUrl": "https://github.com/futuredrivingschool9620-create/Future-driving-school/releases/download/v1.5.2/Future-Driving-School-Setup-1.5.2.exe"
 }

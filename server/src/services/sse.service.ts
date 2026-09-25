@@ -20,10 +20,10 @@ class SSEServiceClass {
   public addClient(adminId: string, res: Response): string {
     const id = Date.now().toString() + Math.random().toString(36).substring(2);
     this.clients.set(id, { id, adminId, res });
-    
+
     // Send initial connection success event
     this.sendToClient(id, { type: 'connected', message: 'SSE Connection Established' });
-    
+
     return id;
   }
 
@@ -31,34 +31,47 @@ class SSEServiceClass {
     this.clients.delete(id);
   }
 
+  private safeWrite(id: string, client: SSEClient, payload: string): boolean {
+    try {
+      if (client.res.destroyed || client.res.writableEnded) {
+        this.clients.delete(id);
+        return false;
+      }
+      client.res.write(payload);
+      return true;
+    } catch {
+      this.clients.delete(id);
+      return false;
+    }
+  }
+
   public sendToClient(id: string, data: any): void {
     const client = this.clients.get(id);
     if (client) {
-      client.res.write(`data: ${JSON.stringify(data)}\n\n`);
+      this.safeWrite(id, client, `data: ${JSON.stringify(data)}\n\n`);
     }
   }
 
   public sendToAdmin(adminId: string, data: any): void {
     const payload = `data: ${JSON.stringify(data)}\n\n`;
-    for (const client of this.clients.values()) {
+    for (const [id, client] of this.clients.entries()) {
       if (client.adminId === adminId) {
-        client.res.write(payload);
+        this.safeWrite(id, client, payload);
       }
     }
   }
 
   public broadcast(data: any): void {
     const payload = `data: ${JSON.stringify(data)}\n\n`;
-    for (const client of this.clients.values()) {
-      client.res.write(payload);
+    for (const [id, client] of this.clients.entries()) {
+      this.safeWrite(id, client, payload);
     }
   }
 
   private broadcastKeepAlive(): void {
-    // Send a comment line which is ignored by the EventSource API, 
-    // but keeps the connection open through load balancers (like Nginx/Render).
-    for (const client of this.clients.values()) {
-      client.res.write(':\n\n'); 
+    // Send comment line to keep connection open through reverse proxies
+    for (const [id, client] of this.clients.entries()) {
+      this.safeWrite(id, client, ':\n\n');
     }
   }
 }
