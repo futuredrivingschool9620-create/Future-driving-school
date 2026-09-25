@@ -7,8 +7,8 @@
     "🖥️ Stabilized Windows DWM compositing and eliminated OS titlebar redraw flashes during navigation",
     "🔄 Extended all-day session integrity and stabilized SSE connection lifecycle after long hours of continuous use"
   ],
-  "downloadUrl": "https://github.com/futuredrivingschool9620-create/Future-driving-school/releases/download/v1.4.2/Future-Driving-School-Setup-1.4.2.exe",
-  "installerUrl": "https://github.com/futuredrivingschool9620-create/Future-driving-school/releases/download/v1.4.2/Future-Driving-School-Setup-1.4.2.exe",
+  "downloadUrl": "https://github.com/futuredrivingschool9620-create/Future-driving-school/releases/download/v1.5.1/Future-Driving-School-Setup-1.5.1.exe",
+  "installerUrl": "https://github.com/futuredrivingschool9620-create/Future-driving-school/releases/download/v1.5.1/Future-Driving-School-Setup-1.5.1.exe",
   "updateBundleUrl": "https://raw.githubusercontent.com/futuredrivingschool9620-create/Future-driving-school/main/update-bundle.zip",
   "mandatory": false,
   "minSupportedVersion": "1.0.0",
