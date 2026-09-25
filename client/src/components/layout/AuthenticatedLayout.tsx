@@ -115,23 +115,36 @@ export default function AuthenticatedLayout() {
 
   const checkForUpdates = useCallback(async () => {
     try {
-      const [apiInfo, versionRes, cloudRes, ghRes] = await Promise.allSettled([
+      const isFileProtocol = typeof window !== 'undefined' && window.location.protocol === 'file:';
+      const promises: Promise<any>[] = [
         appApi.getVersionInfo(clientVersion),
-        fetch(`/version.json?_t=${Date.now()}`, {
-          cache: 'no-store',
-          headers: {
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            Pragma: 'no-cache',
-          },
-        }),
         fetch(`${CLOUD_MANIFEST_URL}?_t=${Date.now()}`, { cache: 'no-store' }),
         fetch('https://api.github.com/repos/futuredrivingschool9620-create/Future-driving-school/releases/latest', {
           headers: { Accept: 'application/vnd.github.v3+json' },
         }),
-      ]);
+      ];
+
+      // Only fetch relative version.json if not on file:// protocol
+      if (!isFileProtocol) {
+        promises.push(
+          fetch(`/version.json?_t=${Date.now()}`, {
+            cache: 'no-store',
+            headers: {
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              Pragma: 'no-cache',
+            },
+          })
+        );
+      }
+
+      const results = await Promise.allSettled(promises);
+      const apiInfo = results[0];
+      const cloudRes = results[1];
+      const ghRes = results[2];
+      const versionRes = !isFileProtocol ? results[3] : null;
 
       let webData: any = null;
-      if (versionRes.status === 'fulfilled' && versionRes.value.ok) {
+      if (versionRes && versionRes.status === 'fulfilled' && versionRes.value.ok) {
         try { webData = await versionRes.value.json(); } catch {}
       }
 
@@ -168,22 +181,14 @@ export default function AuthenticatedLayout() {
   }, [clientVersion]);
 
   useEffect(() => {
+    // Initial check on layout mount
     checkForUpdates();
 
-    // Periodic check every 5 minutes (reduced from 30s to prevent UI flicker)
-    const interval = setInterval(checkForUpdates, 5 * 60 * 1000);
-
-    // Check when user switches back to this tab / window
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        checkForUpdates();
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    // Periodic check every 15 minutes (unobtrusive background check)
+    const interval = setInterval(checkForUpdates, 15 * 60 * 1000);
 
     return () => {
       clearInterval(interval);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [checkForUpdates]);
 
@@ -346,7 +351,7 @@ export default function AuthenticatedLayout() {
               <div className="flex-1 min-w-0">
                 <p className="text-white text-sm font-medium truncate">{admin?.username}</p>
                 <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className={`w-1.5 h-1.5 rounded-full ${hasUpdate ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400'}`}></span>
+                  <span className={`w-1.5 h-1.5 rounded-full ${hasUpdate ? 'bg-amber-400 ring-2 ring-amber-400/30' : 'bg-emerald-400'}`}></span>
                   <span className="text-[11px] text-slate-400 font-mono">v{clientVersion}</span>
                   <span className={`text-[10px] font-medium ${hasUpdate ? 'text-amber-300' : 'text-emerald-400'}`}>
                     • {hasUpdate ? 'Update available' : 'Up to date'}
@@ -393,7 +398,7 @@ export default function AuthenticatedLayout() {
                 }}
                 title={hasUpdate ? `Update v${latestVersion} available! Click to open Settings` : `Application is up to date (v${clientVersion})`}
               >
-                <span className={`w-2 h-2 rounded-full ${hasUpdate ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400'}`} />
+                <span className={`w-2 h-2 rounded-full ${hasUpdate ? 'bg-amber-400 ring-2 ring-amber-400/30' : 'bg-emerald-400'}`} />
                 <span className="font-mono">v{clientVersion}</span>
                 <span className="hidden sm:inline text-[11px] opacity-90 font-medium">
                   {hasUpdate ? `• Update v${latestVersion} Available` : '• Up to date'}

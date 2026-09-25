@@ -12,10 +12,21 @@ const DEFAULT_DESC =
 
 export function useSEO({ title, description, canonical }: SEOProps = {}) {
   useEffect(() => {
-    // 1. Update Document Title
+    // Detect Electron desktop app environment
+    const isDesktopApp =
+      typeof window !== 'undefined' &&
+      (Boolean(window.electronAPI?.isElectron) ||
+        window.location.protocol === 'file:' ||
+        !window.location.origin ||
+        window.location.origin === 'null');
+
     const formattedTitle = title ? `${title} | Future Driving School` : DEFAULT_TITLE;
-    if (document.title !== formattedTitle) {
-      document.title = formattedTitle;
+
+    // 1. Update Document Title only for web browser (prevents Windows OS titlebar repaint flash in desktop app)
+    if (!isDesktopApp) {
+      if (document.title !== formattedTitle) {
+        document.title = formattedTitle;
+      }
     }
 
     // 2. Update Meta Description

@@ -76,16 +76,28 @@
     box-sizing: border-box;
   }
 
+  html, body, #root {
+    background-color: var(--color-bg-primary);
+    color: var(--color-text-primary);
+    min-height: 100vh;
+  }
+
   html {
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeSpeed;
   }
 
   body {
-    background-color: var(--color-bg-primary);
-    color: var(--color-text-primary);
     overflow-x: hidden;
+  }
+
+  /* Form control rendering stabilization — eliminates text input typing jitter & repaint desync */
+  input, textarea, select {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeSpeed;
   }
 
   ::-webkit-scrollbar {
@@ -116,16 +128,19 @@
 }
 
 @layer components {
+  /* 100% Solid Opaque Cards with isolated paint containment to eliminate re-render flickering */
   .glass-card {
-    background: #ffffffee;
+    background: var(--color-bg-secondary);
     border: 1px solid var(--color-border);
     border-radius: 16px;
     box-shadow: 0 4px 6px -1px var(--color-card-shadow), 0 2px 4px -2px var(--color-card-shadow);
     transition: box-shadow 0.2s ease;
+    isolation: isolate;
+    contain: paint;
   }
 
   .dark .glass-card {
-    background: #1e293bee;
+    background: var(--color-bg-secondary);
   }
 
   .glass-card:hover {

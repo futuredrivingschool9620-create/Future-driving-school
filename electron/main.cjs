@@ -4,9 +4,13 @@ const fs = require('fs');
 const { spawn } = require('child_process');
 const http = require('http');
 
-// Enable optimal hardware acceleration and GPU compositing on Windows
+// Hardware acceleration and Windows DWM compositing stabilization switches:
+// Disable DirectComposition and GPU rasterization to permanently eliminate MPO desync, screen tearing, and input-typing flicker on Windows
+app.commandLine.appendSwitch('disable-gpu-rasterization');
+app.commandLine.appendSwitch('disable-direct-composition');
+app.commandLine.appendSwitch('disable-direct-composition-video-overlays');
 app.commandLine.appendSwitch('high-dpi-support', '1');
-app.commandLine.appendSwitch('enable-gpu-rasterization');
+app.commandLine.appendSwitch('force-color-profile', 'srgb');
 app.commandLine.appendSwitch('allow-file-access-from-files');
 app.commandLine.appendSwitch('disable-web-security');
 
@@ -189,6 +193,11 @@ function createWindow() {
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: 'deny' };
+  });
+
+  // Prevent Windows non-client titlebar redraw flash when React page titles change
+  mainWindow.webContents.on('page-title-updated', (event) => {
+    event.preventDefault();
   });
 
   // Enable F12 and Ctrl+Shift+I for DevTools inspection

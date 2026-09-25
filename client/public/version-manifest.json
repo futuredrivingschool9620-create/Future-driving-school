@@ -1,15 +1,16 @@
 {
-  "latestVersion": "1.4.6",
-  "releaseDate": "23 September 2026",
+  "latestVersion": "1.5.1",
+  "releaseDate": "25 September 2026",
   "releaseNotes": [
-    "🖼️ Updated WhatsApp reminder template to official approved scenic header banner",
-    "💻 Synchronized desktop Windows application and web client with latest WhatsApp Cloud API templates",
-    "⚡ Seamless in-app real-time OTA updates without package downloads"
+    "🛡️ Permanently eliminated all UI flickering across data entry, forms, buttons, and page transitions",
+    "⚡ Optimized Skia layout rasterization with 100% solid opaque card paint containment",
+    "🖥️ Stabilized Windows DWM compositing and eliminated OS titlebar redraw flashes during navigation",
+    "🔄 Extended all-day session integrity and stabilized SSE connection lifecycle after long hours of continuous use"
   ],
   "downloadUrl": "https://github.com/futuredrivingschool9620-create/Future-driving-school/releases/download/v1.4.2/Future-Driving-School-Setup-1.4.2.exe",
   "installerUrl": "https://github.com/futuredrivingschool9620-create/Future-driving-school/releases/download/v1.4.2/Future-Driving-School-Setup-1.4.2.exe",
   "updateBundleUrl": "https://raw.githubusercontent.com/futuredrivingschool9620-create/Future-driving-school/main/update-bundle.zip",
   "mandatory": false,
   "minSupportedVersion": "1.0.0",
-  "buildId": "1.4.6"
+  "buildId": "1.5.1"
 }

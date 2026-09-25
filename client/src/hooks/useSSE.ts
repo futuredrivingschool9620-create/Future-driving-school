@@ -22,42 +22,68 @@ export function useSSE(onEvent: (event: SSEEvent) => void) {
   });
 
   useEffect(() => {
-    const token = getAccessToken();
-    if (!token) return;
+    let isClosed = false;
+    let eventSource: EventSource | null = null;
+    let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
 
-    // We can pass token in URL since EventSource doesn't support custom headers easily,
-    // or if the backend relies on cookies.
-    const API_BASE =
-      typeof window !== 'undefined' &&
-      (window.electronAPI?.isElectron ||
-        window.location.protocol === 'file:' ||
-        !window.location.origin ||
-        window.location.origin === 'null')
-        ? 'http://localhost:3001/api'
-        : import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
-    const eventSource = new EventSource(`${API_BASE}/events?token=${token}`, {
-      withCredentials: true,
-    });
+    const connect = () => {
+      if (isClosed) return;
+      const token = getAccessToken();
+      if (!token) return;
 
-    eventSource.onmessage = (event) => {
+      const API_BASE =
+        typeof window !== 'undefined' &&
+        (window.electronAPI?.isElectron ||
+          window.location.protocol === 'file:' ||
+          !window.location.origin ||
+          window.location.origin === 'null')
+          ? 'http://localhost:3001/api'
+          : import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+
       try {
-        const parsed: SSEEvent = JSON.parse(event.data);
-        if (parsed.type === 'connected') {
-          console.log('✅ SSE Connected');
-        } else {
-          onEventRef.current(parsed);
-        }
-      } catch (error) {
-        console.error('Failed to parse SSE message', error);
+        eventSource = new EventSource(`${API_BASE}/events?token=${token}`, {
+          withCredentials: true,
+        });
+
+        eventSource.onmessage = (event) => {
+          try {
+            const parsed: SSEEvent = JSON.parse(event.data);
+            if (parsed.type === 'connected') {
+              // Connected cleanly
+            } else {
+              onEventRef.current(parsed);
+            }
+          } catch {
+            // Ignore malformed payloads silently
+          }
+        };
+
+        eventSource.onerror = () => {
+          if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+          }
+          // Controlled 15s backoff avoids rapid reconnect loop & network jitter
+          if (!isClosed && !reconnectTimeout) {
+            reconnectTimeout = setTimeout(() => {
+              reconnectTimeout = null;
+              connect();
+            }, 15000);
+          }
+        };
+      } catch {
+        // SSE unavailable in this environment; non-blocking
       }
     };
 
-    eventSource.onerror = (error) => {
-      console.error('SSE Error:', error);
-    };
+    connect();
 
     return () => {
-      eventSource.close();
+      isClosed = true;
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+      if (eventSource) {
+        eventSource.close();
+      }
     };
   }, []);
 }

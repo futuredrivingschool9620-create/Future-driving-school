@@ -50,7 +50,7 @@ const envSchema = z.object({
   // JWT
   JWT_ACCESS_SECRET: z.string().min(32),
   JWT_REFRESH_SECRET: z.string().min(32),
-  JWT_ACCESS_EXPIRY: z.string().default('15m'),
+  JWT_ACCESS_EXPIRY: z.string().default('24h'),
   JWT_REFRESH_EXPIRY_DAYS: z.coerce.number().int().positive().default(7),
 
   // Server
