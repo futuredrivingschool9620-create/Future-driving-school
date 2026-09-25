@@ -10,14 +10,14 @@ export interface AppUpdateMetadata {
 
 // In-memory / default version metadata (can be updated via API or env vars)
 let currentUpdateInfo: AppUpdateMetadata = {
-  latestVersion: process.env.APP_LATEST_VERSION || '1.4.0',
-  releaseDate: process.env.APP_RELEASE_DATE || '20 September 2026',
+  latestVersion: process.env.APP_LATEST_VERSION || '1.5.1',
+  releaseDate: process.env.APP_RELEASE_DATE || '25 September 2026',
   releaseNotes: [
-    '✨ Live in-app update system active (instant Riot Games style update)',
-    '⚡ Seamless background sync without downloading a 240 MB installer',
-    '🔔 Instant expiry alerts and WhatsApp notification control',
-    '🚗 Fleet status auto-sync and real-time document compliance',
-    '🛡️ Automatic server port & process lifecycle management',
+    '🛡️ Permanently eliminated all UI flickering across data entry, forms, buttons, and page transitions',
+    '⚡ Optimized Skia layout rasterization with 100% solid opaque card paint containment',
+    '🖥️ Stabilized Windows DWM compositing and eliminated OS titlebar redraw flashes during navigation',
+    '🔄 Extended all-day session integrity and stabilized SSE connection lifecycle after long hours of continuous use',
+    '✨ Seamless in-app instant update delivery across all client PCs without external prompts',
   ],
   downloadUrl:
     process.env.APP_DOWNLOAD_URL ||
