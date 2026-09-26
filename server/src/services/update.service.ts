@@ -10,14 +10,14 @@ export interface AppUpdateMetadata {
 
 // In-memory / default version metadata (can be updated via API or env vars)
 let currentUpdateInfo: AppUpdateMetadata = {
-  latestVersion: process.env.APP_LATEST_VERSION || '1.5.2',
-  releaseDate: process.env.APP_RELEASE_DATE || '25 September 2026',
+  latestVersion: process.env.APP_LATEST_VERSION || '1.5.3',
+  releaseDate: process.env.APP_RELEASE_DATE || '26 September 2026',
   releaseNotes: [
-    '🖥️ Restored DirectComposition hardware rendering and eliminated white screen freezes on Windows',
-    '✨ Fixed card visibility across Home and Dashboard by eliminating paint containment conflicts',
-    '🛡️ Added global React ErrorBoundary with auto-recovery to permanently protect against blank screens',
-    '🔒 Enhanced null-safe customer and vehicle document rendering',
-    '✨ Seamless in-app instant update delivery across all client PCs without external prompts',
+    '🛠️ Fixed the desktop app flickering on page changes and submissions',
+    '🖥️ Eliminated the white/blank screen that forced an app restart during long sessions',
+    '🔐 Auth sessions now stay alive through temporary server or database hiccups',
+    '📦 In-app updates are verified before they are applied, so a bad download can never blank the app',
+    '🛡️ Hardened automatic recovery with rate limiting to prevent reload loops',
   ],
   downloadUrl:
     process.env.APP_DOWNLOAD_URL ||

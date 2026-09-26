@@ -159,6 +159,116 @@ export function getRefreshToken(): string | null {
   return safeStorage.getItem(REFRESH_TOKEN_STORAGE_KEY) || safeSessionStorage.getItem(REFRESH_TOKEN_STORAGE_KEY);
 }
 
+// ── Session Expiry Broadcasting ──
+// When the server *definitively* rejects a refresh token (401/403), the session is dead.
+// We must never navigate from inside the interceptor: writing window.location.hash here
+// fights React Router and produced an endless '#/login' ⇄ '/' redirect loop (visible as
+// flicker on every page switch/submit, eventually leaving a blank white window).
+// Instead we clear credentials once, notify the auth layer, and let the router render login.
+
+class MissingSessionError extends Error {
+  constructor() {
+    super('No refresh token available');
+    this.name = 'MissingSessionError';
+  }
+}
+
+type SessionExpiredListener = () => void;
+
+const sessionExpiredListeners = new Set<SessionExpiredListener>();
+let sessionExpiredLatched = false;
+
+/** Subscribe to "the stored session is no longer valid" events. */
+export function onSessionExpired(listener: SessionExpiredListener): () => void {
+  sessionExpiredListeners.add(listener);
+  return () => {
+    sessionExpiredListeners.delete(listener);
+  };
+}
+
+/** Allow a fresh login to arm session-expiry handling again. */
+export function resetSessionExpiredLatch(): void {
+  sessionExpiredLatched = false;
+}
+
+/**
+ * Clears credentials exactly once per expired session and lets the auth provider drop the
+ * signed-in admin. A latched one-shot ensures no redirect/navigation storm can ever occur.
+ */
+function broadcastSessionExpired(): void {
+  if (sessionExpiredLatched) return;
+  sessionExpiredLatched = true;
+
+  setAccessToken(null);
+  setRefreshToken(null);
+  invalidateClientCache();
+
+  if (sessionExpiredListeners.size > 0) {
+    sessionExpiredListeners.forEach((listener) => {
+      try {
+        listener();
+      } catch (e) {
+        console.error('[Auth] session-expired listener error:', e);
+      }
+    });
+    return;
+  }
+
+  // Fallback: auth provider not mounted yet (very early boot). Navigate once, never in a loop.
+  if (typeof window !== 'undefined') {
+    if (window.location.protocol === 'file:' || window.location.hash) {
+      if (window.location.hash !== '#/login') {
+        window.location.hash = '#/login';
+      }
+    } else if (window.location.pathname !== '/login') {
+      window.location.href = '/login';
+    }
+  }
+}
+
+// Single-flight refresh: concurrent 401s share ONE refresh request. This removes the
+// refresh-token rotation race that caused random "session dropout" mid-session.
+let refreshPromise: Promise<string> | null = null;
+
+function performTokenRefresh(): Promise<string> {
+  if (!refreshPromise) {
+    refreshPromise = (async () => {
+      const storedRefreshToken = getRefreshToken();
+      if (!storedRefreshToken) {
+        throw new MissingSessionError();
+      }
+      const { data } = await axios.post<AuthResponse>(
+        `${API_BASE}/auth/refresh`,
+        { refreshToken: storedRefreshToken },
+        { withCredentials: true }
+      );
+      if (!data?.accessToken) {
+        throw new MissingSessionError();
+      }
+      setAccessToken(data.accessToken);
+      if (data.refreshToken) {
+        setRefreshToken(data.refreshToken);
+      }
+      return data.accessToken;
+    })().finally(() => {
+      refreshPromise = null;
+    });
+  }
+  return refreshPromise;
+}
+
+/** True only when the server explicitly rejected our credentials. */
+function isAuthRejection(err: unknown): boolean {
+  const status = (err as { response?: { status?: number } })?.response?.status;
+  return status === 401 || status === 403;
+}
+
+/** True for transient infrastructure problems (DB blip, 5xx, offline) — NOT a logout. */
+function isTransientFailure(err: unknown): boolean {
+  const status = (err as { response?: { status?: number } })?.response?.status;
+  return status === undefined || status === 429 || status >= 500;
+}
+
 // Request interceptor — attach access token
 api.interceptors.request.use((config) => {
   const token = getAccessToken();
@@ -173,44 +283,44 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+    const requestUrl: string = originalRequest?.url || '';
+    const isAuthEndpoint =
+      requestUrl.includes('/auth/login') ||
+      requestUrl.includes('/auth/refresh') ||
+      requestUrl.includes('/auth/logout');
 
     if (
       error.response?.status === 401 &&
+      originalRequest &&
       !originalRequest._retry &&
-      !originalRequest.url?.includes('/auth/login') &&
-      !originalRequest.url?.includes('/auth/refresh')
+      !isAuthEndpoint
     ) {
       originalRequest._retry = true;
 
       try {
-        const storedRefreshToken = getRefreshToken();
-        const { data } = await axios.post<AuthResponse>(
-          `${API_BASE}/auth/refresh`,
-          { refreshToken: storedRefreshToken },
-          { withCredentials: true }
-        );
-        setAccessToken(data.accessToken);
-        if (data.refreshToken) {
-          setRefreshToken(data.refreshToken);
-        }
-        originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
+        const newAccessToken = await performTokenRefresh();
+        originalRequest.headers = originalRequest.headers || {};
+        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
         return api(originalRequest);
-      } catch {
-        logDiagnostic({
-          category: 'auth',
-          endpoint: '/auth/refresh',
-          status: 401,
-          message: 'Refresh token expired or invalid; requiring user login',
-        });
-        setAccessToken(null);
-        setRefreshToken(null);
-        if (typeof window !== 'undefined') {
-          if (window.location.protocol === 'file:' || window.location.hash) {
-            window.location.hash = '#/login';
-          } else if (window.location.pathname !== '/login') {
-            window.location.href = '/login';
-          }
+      } catch (refreshError) {
+        if (refreshError instanceof MissingSessionError || isAuthRejection(refreshError)) {
+          // Credentials are genuinely invalid/expired -> end session once, cleanly.
+          logDiagnostic({
+            category: 'auth',
+            endpoint: '/auth/refresh',
+            status: 401,
+            message: 'Refresh token expired or invalid; requiring user login',
+          });
+          broadcastSessionExpired();
+        } else if (isTransientFailure(refreshError)) {
+          // A temporary server/DB/network failure must NEVER log the user out.
+          logDiagnostic({
+            category: 'api',
+            endpoint: '/auth/refresh',
+            message: 'Token refresh temporarily unavailable (transient server/database error); session preserved',
+          });
         }
+        originalRequest._retry = false;
         return Promise.reject(error);
       }
     }
@@ -327,6 +437,7 @@ export const authApi = {
     if (data.refreshToken) {
       setRefreshToken(data.refreshToken, rememberMe);
     }
+    resetSessionExpiredLatch();
     invalidateClientCache();
     return data;
   },
@@ -348,6 +459,7 @@ export const authApi = {
     } catch {}
     setAccessToken(null);
     setRefreshToken(null);
+    resetSessionExpiredLatch();
     invalidateClientCache();
   },
 
@@ -355,6 +467,7 @@ export const authApi = {
     const { data } = await api.put<{ message: string }>('/auth/change-password', input);
     setAccessToken(null);
     setRefreshToken(null);
+    resetSessionExpiredLatch();
     invalidateClientCache();
     return data;
   },

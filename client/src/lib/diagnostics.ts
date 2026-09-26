@@ -16,6 +16,30 @@ export interface DiagnosticLogEntry {
 const STORAGE_KEY = 'fds_diagnostics';
 const MAX_LOG_ENTRIES = 100;
 
+// Diagnostics must never amplify a failure storm. Without this gate a redirect/error loop
+// turns every iteration into a synchronous localStorage write plus an HTTP POST, which
+// saturates the main thread and leaves the window unable to paint (blank white screen).
+const RATE_WINDOW_MS = 5000;
+const MAX_LOGS_PER_WINDOW = 8;
+const recentLogTimestamps: number[] = [];
+let rateLimitNoticeLogged = false;
+
+function isRateLimited(): boolean {
+  const now = Date.now();
+  while (recentLogTimestamps.length > 0 && now - recentLogTimestamps[0] > RATE_WINDOW_MS) {
+    recentLogTimestamps.shift();
+  }
+  if (recentLogTimestamps.length >= MAX_LOGS_PER_WINDOW) {
+    if (!rateLimitNoticeLogged) {
+      rateLimitNoticeLogged = true;
+      console.warn('[DIAGNOSTICS] Rate limit reached; suppressing further log writes for this window.');
+    }
+    return true;
+  }
+  recentLogTimestamps.push(now);
+  return false;
+}
+
 function sanitizeText(input: string): string {
   if (!input) return '';
   return input
@@ -38,6 +62,11 @@ export function logDiagnostic(entry: {
   details?: any;
 }): void {
   try {
+    if (isRateLimited()) {
+      return;
+    }
+    rateLimitNoticeLogged = false;
+
     const memory = (performance as any)?.memory;
     const memoryMb = memory ? Math.round(memory.usedJSHeapSize / (1024 * 1024)) : undefined;
     const page = typeof window !== 'undefined' ? window.location.hash || window.location.pathname : 'unknown';

@@ -5,9 +5,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   isElectron: true,
   appVersion: (() => {
     try {
-      return ipcRenderer.sendSync('get-app-version-sync') || '1.5.2';
+      return ipcRenderer.sendSync('get-app-version-sync') || '1.5.3';
     } catch {
-      return '1.5.2';
+      return '1.5.3';
     }
   })(),
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),

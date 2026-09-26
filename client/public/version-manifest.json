@@ -1,16 +1,17 @@
 {
-  "latestVersion": "1.5.1",
-  "releaseDate": "25 September 2026",
+  "latestVersion": "1.5.3",
+  "releaseDate": "26 September 2026",
   "releaseNotes": [
-    "🛡️ Permanently eliminated all UI flickering across data entry, forms, buttons, and page transitions",
-    "⚡ Optimized Skia layout rasterization with 100% solid opaque card paint containment",
-    "🖥️ Stabilized Windows DWM compositing and eliminated OS titlebar redraw flashes during navigation",
-    "🔄 Extended all-day session integrity and stabilized SSE connection lifecycle after long hours of continuous use"
+    "🛠️ Fixed the desktop app flickering on page changes and submissions",
+    "🖥️ Eliminated the white/blank screen that forced an app restart during long sessions",
+    "🔐 Auth sessions now stay alive through temporary server or database hiccups",
+    "📦 In-app updates are verified before they are applied, so a bad download can never blank the app",
+    "🛡️ Hardened automatic recovery with rate limiting to prevent reload loops"
   ],
-  "downloadUrl": "https://github.com/futuredrivingschool9620-create/Future-driving-school/releases/download/v1.4.2/Future-Driving-School-Setup-1.4.2.exe",
-  "installerUrl": "https://github.com/futuredrivingschool9620-create/Future-driving-school/releases/download/v1.4.2/Future-Driving-School-Setup-1.4.2.exe",
+  "downloadUrl": "https://github.com/futuredrivingschool9620-create/Future-driving-school/releases/download/v1.5.3/Future-Driving-School-Setup-1.5.3.exe",
+  "installerUrl": "https://github.com/futuredrivingschool9620-create/Future-driving-school/releases/download/v1.5.3/Future-Driving-School-Setup-1.5.3.exe",
   "updateBundleUrl": "https://raw.githubusercontent.com/futuredrivingschool9620-create/Future-driving-school/main/update-bundle.zip",
   "mandatory": false,
   "minSupportedVersion": "1.0.0",
-  "buildId": "1.5.1"
+  "buildId": "1.5.3"
 }

@@ -42,7 +42,7 @@ function sleep(ms) {
 
 async function runAudit() {
   console.log('====================================================');
-  console.log('🧪 FUTURE DRIVING SCHOOL v1.5.2 STABILITY AUDIT SUITE');
+  console.log('🧪 FUTURE DRIVING SCHOOL v1.5.3 STABILITY AUDIT SUITE');
   console.log('====================================================\n');
 
   const startMemory = process.memoryUsage();

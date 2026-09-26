@@ -1,5 +1,6 @@
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
+import { getAccessToken } from './lib/api';
 import LoginPage from './features/auth/LoginPage';
 import HomePage from './features/home/HomePage';
 import DashboardPage from './features/dashboard/DashboardPage';
@@ -30,7 +31,10 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!isAuthenticated) {
+  // Requiring BOTH a signed-in admin AND a live access token makes the '#/login' ⇄ '/'
+  // redirect loop structurally impossible: protected pages can never mount without
+  // credentials, so they can never fire requests that 401 back into a redirect.
+  if (!isAuthenticated || !getAccessToken()) {
     return <Navigate to="/login" replace />;
   }
 
@@ -50,7 +54,7 @@ export default function AppRouter() {
               <div className="flex items-center justify-center min-h-screen">
                 <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
               </div>
-            ) : isAuthenticated ? (
+            ) : isAuthenticated && getAccessToken() ? (
               <Navigate to="/" replace />
             ) : (
               <LoginPage />

@@ -1,14 +1,15 @@
 {
-  "buildId": "1.5.2",
-  "buildTime": "2026-09-25T13:40:00.000Z",
-  "version": "1.5.2",
-  "latestVersion": "1.5.2",
-  "releaseDate": "25 September 2026",
+  "buildId": "1.5.3",
+  "buildTime": "2026-09-26T00:00:00.000Z",
+  "version": "1.5.3",
+  "latestVersion": "1.5.3",
+  "releaseDate": "26 September 2026",
   "releaseNotes": [
-    "🖥️ Restored DirectComposition hardware rendering and eliminated white screen freezes on Windows",
-    "✨ Fixed card visibility across Home and Dashboard by eliminating paint containment conflicts",
-    "🛡️ Added global React ErrorBoundary with auto-recovery to permanently protect against blank screens",
-    "🔒 Enhanced null-safe customer and vehicle document rendering"
+    "🛠️ Fixed the desktop app flickering on page changes and submissions",
+    "🖥️ Eliminated the white/blank screen that forced an app restart during long sessions",
+    "🔐 Auth sessions now stay alive through temporary server or database hiccups",
+    "📦 In-app updates are verified before they are applied, so a bad download can never blank the app",
+    "🛡️ Hardened automatic recovery with rate limiting to prevent reload loops"
   ],
-  "downloadUrl": "https://github.com/futuredrivingschool9620-create/Future-driving-school/releases/download/v1.5.2/Future-Driving-School-Setup-1.5.2.exe"
+  "downloadUrl": "https://github.com/futuredrivingschool9620-create/Future-driving-school/releases/download/v1.5.3/Future-Driving-School-Setup-1.5.3.exe"
 }

@@ -6,7 +6,7 @@ import './index.css';
 
 export default function App() {
   return (
-    <ErrorBoundary>
+    <ErrorBoundary autoRecover>
       <ThemeProvider>
         <AuthProvider>
           <AppRouter />

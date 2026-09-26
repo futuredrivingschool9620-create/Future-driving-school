@@ -4,6 +4,10 @@ import { logDiagnostic } from '../../lib/diagnostics';
 interface Props {
   children: ReactNode;
   fallback?: ReactNode;
+  /** When this value changes (e.g. the current route), the boundary self-heals. */
+  resetKey?: string | number;
+  /** Retry rendering once before showing the fallback UI. */
+  autoRecover?: boolean;
 }
 
 interface State {
@@ -12,6 +16,10 @@ interface State {
 }
 
 export default class ErrorBoundary extends Component<Props, State> {
+  private recoveryTimer: ReturnType<typeof setTimeout> | null = null;
+  private recoveryAttempts = 0;
+  private static readonly MAX_AUTO_RECOVERY = 1;
+
   public state: State = {
     hasError: false,
     error: null,
@@ -29,11 +37,42 @@ export default class ErrorBoundary extends Component<Props, State> {
       message: error?.message || 'Component rendering error',
       details: errorInfo?.componentStack,
     });
+
+    // A single automatic retry recovers transient render glitches without a reload.
+    // If it throws again the attempts are exhausted and the fallback UI is shown.
+    if (this.props.autoRecover && this.recoveryAttempts < ErrorBoundary.MAX_AUTO_RECOVERY) {
+      this.recoveryAttempts += 1;
+      this.recoveryTimer = setTimeout(() => {
+        this.recoveryTimer = null;
+        if (this.state.hasError) {
+          this.setState({ hasError: false, error: null });
+        }
+      }, 60);
+    }
+  }
+
+  public componentDidUpdate(prevProps: Props) {
+    if (prevProps.resetKey !== this.props.resetKey) {
+      this.recoveryAttempts = 0;
+      if (this.state.hasError) {
+        this.setState({ hasError: false, error: null });
+      }
+    }
+  }
+
+  public componentWillUnmount() {
+    if (this.recoveryTimer) {
+      clearTimeout(this.recoveryTimer);
+      this.recoveryTimer = null;
+    }
   }
 
   private handleReload = () => {
+    this.recoveryAttempts = 0;
     this.setState({ hasError: false, error: null });
     if (typeof window !== 'undefined') {
+      // Recover in-place first; only fall back to a hard reload when in-place recovery
+      // is not possible. A hard reload must never happen automatically on a live window.
       window.location.hash = '#/';
       window.location.reload();
     }

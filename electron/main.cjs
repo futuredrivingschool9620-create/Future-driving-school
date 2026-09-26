@@ -124,8 +124,81 @@ function compareVersions(v1, v2) {
   return 0;
 }
 
+// ── Update Bundle Integrity ──
+// A partially-extracted bundle (interrupted download/PowerShell expand) used to be loaded
+// anyway. Because index.html then referenced asset files that were never written, the
+// window rendered an empty #root — a permanent blank white screen. Every bundle must now
+// prove it is complete before it can ever be loaded.
+function verifyBundleIntegrity(bundleDir) {
+  const indexPath = path.join(bundleDir, 'index.html');
+  if (!fs.existsSync(indexPath)) {
+    throw new Error('Update bundle is missing index.html');
+  }
+
+  const html = fs.readFileSync(indexPath, 'utf8');
+  const referenced = [];
+  const pattern = /(?:src|href)="([^"]+)"/g;
+  let match;
+  while ((match = pattern.exec(html)) !== null) {
+    const ref = match[1];
+    if (!ref || ref.startsWith('#') || ref.startsWith('data:') || /^(https?:)?\/\//i.test(ref)) {
+      continue;
+    }
+    referenced.push(ref.replace(/^\.\//, ''));
+  }
+
+  const missing = referenced.filter(
+    (rel) => !fs.existsSync(path.join(bundleDir, rel.split('/').join(path.sep)))
+  );
+
+  if (missing.length > 0) {
+    throw new Error(`Update bundle is incomplete. Missing: ${missing.join(', ')}`);
+  }
+  return true;
+}
+
+function isBundleUsable(bundleDir) {
+  try {
+    return verifyBundleIntegrity(bundleDir) === true;
+  } catch (e) {
+    console.warn('[Electron] Rejecting update bundle:', e.message);
+    return false;
+  }
+}
+
+function expandArchive(zipPath, destinationDir) {
+  return new Promise((resolve, reject) => {
+    const escapeSingleQuotes = (p) => String(p).replace(/'/g, "''");
+    const ps = spawn(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        `Expand-Archive -LiteralPath '${escapeSingleQuotes(zipPath)}' -DestinationPath '${escapeSingleQuotes(destinationDir)}' -Force`,
+      ],
+      { windowsHide: true }
+    );
+    ps.on('close', (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`Extraction failed with code ${code}`));
+    });
+    ps.on('error', reject);
+  });
+}
+
+// Guards against overlapping document loads, which are themselves a source of flashing.
+let isContentLoading = false;
+let lastContentLoadAt = 0;
+
 function loadAppContent() {
-  if (!mainWindow) return;
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+
+  if (isContentLoading) {
+    console.log('[Electron] A content load is already in flight; ignoring duplicate request.');
+    return;
+  }
+
   const updateDir = path.join(app.getPath('userData'), 'update');
   const updateIndexPath = path.join(updateDir, 'index.html');
   const updateVersionJson = path.join(updateDir, 'version.json');
@@ -147,14 +220,52 @@ function loadAppContent() {
     }
   }
 
-  if (useUpdate && fs.existsSync(updateIndexPath)) {
-    console.log('[Electron] Loading updated in-app bundle from:', updateIndexPath);
-    mainWindow.loadFile(updateIndexPath);
-  } else {
-    const defaultIndexPath = path.join(__dirname, '..', 'client', 'dist', 'index.html');
-    console.log('[Electron] Loading packaged app bundle from:', defaultIndexPath);
-    mainWindow.loadFile(defaultIndexPath);
+  if (useUpdate && fs.existsSync(updateIndexPath) && isBundleUsable(updateDir)) {
+    console.log('[Electron] Loading verified in-app bundle from:', updateIndexPath);
+    isContentLoading = true;
+    lastContentLoadAt = Date.now();
+    mainWindow.loadFile(updateIndexPath).catch((err) => {
+      console.error('[Electron] Failed to load in-app bundle:', err.message);
+    }).finally(() => {
+      isContentLoading = false;
+    });
+    return;
   }
+
+  if (useUpdate) {
+    // Self-heal: never let a corrupt bundle blank the window. Removing it makes the next
+    // start (and this load) fall back to the known-good packaged application.
+    console.warn('[Electron] In-app bundle failed verification; quarantining it and using packaged app.');
+    try {
+      fs.rmSync(updateDir, { recursive: true, force: true });
+    } catch (e) {
+      console.error('[Electron] Could not remove corrupt in-app bundle:', e.message);
+    }
+  } else if (fs.existsSync(updateDir)) {
+    // The stored in-app bundle is older than this installation, so it will never be used
+    // again. Removing it reclaims disk and removes any chance of a stale bundle loading.
+    console.log('[Electron] Removing superseded in-app bundle from a previous version.');
+    try {
+      fs.rmSync(updateDir, { recursive: true, force: true });
+    } catch (e) {
+      console.error('[Electron] Could not remove superseded in-app bundle:', e.message);
+    }
+  }
+
+  const defaultIndexPath = path.join(__dirname, '..', 'client', 'dist', 'index.html');
+  if (!fs.existsSync(defaultIndexPath)) {
+    console.error('[Electron] Packaged application bundle is missing at:', defaultIndexPath);
+    return;
+  }
+
+  console.log('[Electron] Loading packaged app bundle from:', defaultIndexPath);
+  isContentLoading = true;
+  lastContentLoadAt = Date.now();
+  mainWindow.loadFile(defaultIndexPath).catch((err) => {
+    console.error('[Electron] Failed to load packaged bundle:', err.message);
+  }).finally(() => {
+    isContentLoading = false;
+  });
 }
 
 function createWindow() {
@@ -204,25 +315,79 @@ function createWindow() {
     }
   });
 
-  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
-    console.error('MainWindow failed to load:', errorCode, errorDescription, validatedURL);
-    if (validatedURL && (validatedURL.includes('/login') || !validatedURL.includes('index.html'))) {
-      console.log('[Electron] Attempting recovery to local index.html');
-      loadAppContent();
+  // ── Recovery governor ──
+  // Previously ANY load failure, renderer crash, or momentary hang triggered an immediate
+  // window reload. Those reloads are what users saw as "flickering", and a repeating
+  // reload loop left a permanently blank white window. Recovery is now rate limited,
+  // de-bounced, and only ever performed when the window is genuinely unusable.
+  const RECOVERY_WINDOW_MS = 60000;
+  const MAX_RECOVERIES_PER_WINDOW = 2;
+  const recoveryTimestamps = [];
+  let isRecovering = false;
+  let isUnresponsive = false;
+
+  const canRecover = () => {
+    const now = Date.now();
+    while (recoveryTimestamps.length > 0 && now - recoveryTimestamps[0] > RECOVERY_WINDOW_MS) {
+      recoveryTimestamps.shift();
     }
-  });
+    return recoveryTimestamps.length < MAX_RECOVERIES_PER_WINDOW;
+  };
+
+  const recoverWindow = (reason) => {
+    if (!mainWindow || mainWindow.isDestroyed() || isRecovering) return;
+    if (!canRecover()) {
+      console.error(
+        `[Electron] Recovery suppressed (${reason}): limit of ${MAX_RECOVERIES_PER_WINDOW} reloads per minute reached. Leaving the current view untouched.`
+      );
+      return;
+    }
+    isRecovering = true;
+    recoveryTimestamps.push(Date.now());
+    console.warn(`[Electron] Recovering window (${reason})...`);
+    setTimeout(() => {
+      isRecovering = false;
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        loadAppContent();
+      }
+    }, 300);
+  };
+
+  mainWindow.webContents.on(
+    'did-fail-load',
+    (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+      // -3 (ERR_ABORTED) is emitted for normal superseded navigations; never treat as failure.
+      if (errorCode === -3) return;
+      if (isMainFrame === false) return;
+      console.error('MainWindow failed to load:', errorCode, errorDescription, validatedURL);
+      recoverWindow(`did-fail-load ${errorCode}`);
+    }
+  );
 
   mainWindow.webContents.on('render-process-gone', (_event, details) => {
     console.error('[Electron] Renderer process gone:', details.reason, details.exitCode);
     if (details.reason !== 'clean-exit') {
-      console.log('[Electron] Automatically reloading window after renderer crash...');
-      loadAppContent();
+      recoverWindow(`render-process-gone ${details.reason}`);
     }
   });
 
   mainWindow.on('unresponsive', () => {
-    console.warn('[Electron] Window unresponsive, attempting to reload...');
-    loadAppContent();
+    isUnresponsive = true;
+    console.warn('[Electron] Window reported unresponsive; allowing it to recover on its own...');
+    // A brief main-thread block (large export, PDF parse, heavy render) is normal and must
+    // never trigger a reload. Only a sustained hang of 15s justifies a single recovery.
+    setTimeout(() => {
+      if (isUnresponsive) {
+        recoverWindow('sustained unresponsive window');
+      }
+    }, 15000);
+  });
+
+  mainWindow.on('responsive', () => {
+    if (isUnresponsive) {
+      console.log('[Electron] Window responsive again; no recovery needed.');
+    }
+    isUnresponsive = false;
   });
 
   mainWindow.webContents.on('console-message', (_event, _level, message) => {
@@ -299,59 +464,94 @@ ipcMain.on('open-external-url', (_event, url) => {
 
 // Purge cache and reload application on update
 ipcMain.on('app-reload-update', () => {
-  if (mainWindow) {
-    console.log('[Electron] Purging cache and reloading application...');
-    mainWindow.webContents.session.clearCache().then(() => {
-      loadAppContent();
-    });
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+
+  // The in-app updater already loads the freshly installed bundle. Skipping the immediate
+  // follow-up reload keeps an upgrade to a single, flicker-free load.
+  if (Date.now() - lastContentLoadAt < 3000) {
+    console.log('[Electron] Reload skipped: fresh content was loaded moments ago.');
+    return;
   }
+
+  console.log('[Electron] Purging cache and reloading application...');
+  mainWindow.webContents.session.clearCache().then(() => {
+    loadAppContent();
+  });
 });
 
 // Download and apply in-app hot update bundle without downloading or running a new .exe
 ipcMain.handle('apply-in-app-update', async (_event, updateUrl) => {
+  const userDataDir = app.getPath('userData');
+  const liveDir = path.join(userDataDir, 'update');
+  const stagingDir = path.join(userDataDir, 'update-staging');
+  const previousDir = path.join(userDataDir, 'update-previous');
+  const zipPath = path.join(userDataDir, 'update-bundle.zip');
+
   try {
     if (!updateUrl) throw new Error('No update URL provided');
     console.log('[Electron] Downloading in-app update bundle from:', updateUrl);
 
-    const updateDir = path.join(app.getPath('userData'), 'update');
-    const zipPath = path.join(app.getPath('userData'), 'update-bundle.zip');
-
-    const res = await fetch(updateUrl);
+    const res = await fetch(updateUrl, { cache: 'no-store' });
     if (!res.ok) throw new Error(`Download failed: HTTP ${res.status}`);
     const buffer = Buffer.from(await res.arrayBuffer());
+    if (buffer.length === 0) throw new Error('Downloaded update bundle is empty');
     fs.writeFileSync(zipPath, buffer);
 
-    if (!fs.existsSync(updateDir)) {
-      fs.mkdirSync(updateDir, { recursive: true });
+    // 1. Extract into a throwaway staging directory — never straight over the live bundle,
+    //    so an interrupted extraction can no longer leave a half-written app behind.
+    fs.rmSync(stagingDir, { recursive: true, force: true });
+    fs.mkdirSync(stagingDir, { recursive: true });
+    await expandArchive(zipPath, stagingDir);
+
+    // 2. Prove the bundle is complete (index.html + every referenced asset) before use.
+    verifyBundleIntegrity(stagingDir);
+
+    // 3. Activate it, keeping the previous bundle as a rollback point.
+    let activated = false;
+    try {
+      fs.rmSync(previousDir, { recursive: true, force: true });
+      if (fs.existsSync(liveDir)) {
+        fs.renameSync(liveDir, previousDir);
+      }
+      fs.renameSync(stagingDir, liveDir);
+      activated = true;
+    } catch (swapErr) {
+      console.warn('[Electron] In-place swap unavailable, copying verified bundle:', swapErr.message);
+      if (fs.existsSync(stagingDir)) {
+        fs.cpSync(stagingDir, liveDir, { recursive: true, force: true });
+        activated = true;
+      }
     }
 
-    // Unpack on Windows via PowerShell Expand-Archive
-    await new Promise((resolve, reject) => {
-      const ps = spawn('powershell.exe', [
-        '-NoProfile',
-        '-NonInteractive',
-        '-Command',
-        `Expand-Archive -Path '${zipPath}' -DestinationPath '${updateDir}' -Force`
-      ]);
-      ps.on('close', (code) => {
-        if (code === 0) resolve();
-        else reject(new Error(`Extraction failed with code ${code}`));
-      });
-      ps.on('error', reject);
-    });
+    if (!activated) {
+      throw new Error('Could not activate the verified update bundle');
+    }
 
-    try { fs.unlinkSync(zipPath); } catch {}
+    try { fs.rmSync(previousDir, { recursive: true, force: true }); } catch {}
+    try { fs.rmSync(zipPath, { force: true }); } catch {}
 
-    const updateIndex = path.join(updateDir, 'index.html');
-    if (fs.existsSync(updateIndex) && mainWindow) {
-      console.log('[Electron] In-app update extracted successfully! Reloading...');
+    console.log('[Electron] In-app update verified and applied successfully. Loading new bundle...');
+    if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.session.clearCache().then(() => {
-        mainWindow.loadFile(updateIndex);
+        loadAppContent();
       });
     }
     return { success: true };
   } catch (err) {
     console.error('[Electron] Error applying in-app update:', err);
+
+    // Roll back so the user is always left with a working application.
+    try {
+      if (!fs.existsSync(liveDir) && fs.existsSync(previousDir)) {
+        fs.renameSync(previousDir, liveDir);
+        console.log('[Electron] Rolled back to the previously installed bundle.');
+      }
+      fs.rmSync(stagingDir, { recursive: true, force: true });
+      fs.rmSync(zipPath, { force: true });
+    } catch (cleanupErr) {
+      console.error('[Electron] Update rollback cleanup failed:', cleanupErr.message);
+    }
+
     return { success: false, error: err.message };
   }
 });

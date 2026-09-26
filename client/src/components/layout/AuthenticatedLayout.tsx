@@ -422,7 +422,9 @@ export default function AuthenticatedLayout() {
 
         {/* Page Content */}
         <div className="p-4 md:p-8">
-          <ErrorBoundary>
+          {/* Keyed by route so a caught render error can never pin this fallback across
+              subsequent page navigations (the "stuck blank page" failure mode). */}
+          <ErrorBoundary resetKey={location.pathname}>
             <Outlet />
           </ErrorBoundary>
         </div>

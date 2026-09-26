@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
-import { authApi, setAccessToken } from '../lib/api';
+import { authApi, setAccessToken, setRefreshToken, onSessionExpired, invalidateClientCache } from '../lib/api';
 import type { AdminProfile } from '../types';
 
 interface AuthContextType {
@@ -22,8 +22,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAdmin(profile);
   }, []);
 
+  // React to definitive session expiry raised by the API layer (expired/revoked refresh
+  // token). Dropping `admin` here is what keeps React Router and the API layer in sync:
+  // without it the router still believed the user was signed in and bounced '/login'
+  // straight back to '/', producing an endless redirect loop (flicker + blank window).
+  useEffect(() => {
+    const unsubscribe = onSessionExpired(() => {
+      setAdmin(null);
+      setAccessToken(null);
+      setRefreshToken(null);
+      invalidateClientCache();
+    });
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
   // Try to restore session on mount
   useEffect(() => {
+    let isCancelled = false;
+
     const initAuth = async () => {
       try {
         // 1. Try to restore session using stored access token
@@ -32,18 +50,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
           // 2. Fallback to refreshing token via cookie
           await authApi.refresh();
+          if (isCancelled) return;
           await refreshProfile();
         } catch {
           // Not authenticated
+          if (isCancelled) return;
           setAdmin(null);
           setAccessToken(null);
         }
       } finally {
-        setIsLoading(false);
+        if (!isCancelled) {
+          setIsLoading(false);
+        }
       }
     };
 
     initAuth();
+
+    return () => {
+      isCancelled = true;
+    };
   }, [refreshProfile]);
 
   const login = async (username: string, password: string, rememberMe: boolean = false) => {
